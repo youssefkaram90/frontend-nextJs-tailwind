@@ -1,6 +1,4 @@
-import { error } from "console";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ||"";
 
 export async function api<T>(
   endpoint: string,
@@ -8,9 +6,8 @@ export async function api<T>(
 ): Promise<T> {
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
-    credentials: "include",
     headers: {
-      "Contrnt-type": "application/json",
+      "Content-Type": "application/json",
       ...options.headers,
     },
   });

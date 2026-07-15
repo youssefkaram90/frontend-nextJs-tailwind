@@ -1,15 +1,15 @@
 import {api} from "./api"
 
-export interface SinginDto {
+export interface SigninDto {
     name:string;
     password:string;
 }
 
-export async function singin(singinDto :SinginDto ){
+export async function singin(signinDto :SigninDto ){
     return api(
-        '/auth/signin',
+        '/api/auth/signin',
         {
         method:"POST",
-        body:JSON.stringify(singinDto),
+        body:JSON.stringify(signinDto),
     });
 }

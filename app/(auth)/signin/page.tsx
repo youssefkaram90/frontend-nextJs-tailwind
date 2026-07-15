@@ -1,16 +1,16 @@
 "use client";
 
 import { singin } from "@/app/lib/auth";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function Loginpage() {
+export default function Signin() {
   const router = useRouter();
 
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
       await singin({
@@ -20,6 +20,7 @@ export default function Loginpage() {
 
       router.push("/dashboard");
     } catch (error) {
+      console.log('error :', error);
       alert("Error");
     }
   }
