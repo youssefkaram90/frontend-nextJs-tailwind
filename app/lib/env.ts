@@ -1,7 +1,14 @@
-export const env = {
-  // Used by BFF route handlers (server-side only — safe)
-  BACKEND_URL: process.env.BACKEND_URL!,
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required envirement variable ${name}`);
+  }
 
-  // Keep for backward compat if needed
+  return value;
+}
+
+export const env = {
+  BACKEND_URL: requireEnv("BACKEND_URL"),
+
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
 };

@@ -4,7 +4,9 @@ export async function api<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_URL}${endpoint}`, {
+
+  const url = endpoint.startsWith("/api/") ? endpoint : `${API_URL}${endpoint}`
+  const response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",

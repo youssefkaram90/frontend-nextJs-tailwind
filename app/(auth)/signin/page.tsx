@@ -20,7 +20,6 @@ export default function Signin() {
 
       router.push("/dashboard");
     } catch (error) {
-      console.log('error :', error);
       alert("Error");
     }
   }

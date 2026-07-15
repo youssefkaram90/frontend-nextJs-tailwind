@@ -1,23 +1,39 @@
-
 import { NextRequest } from "next/server";
+import { env } from "@/app/lib/env";
 
+const BACKEND_URL =env.BACKEND_URL;
 
-const BACKEND_URL = process.env.BACKEND_URL;
+export async function POST(request: NextRequest) {
+  const BACKEND_TIMEOUT_MS = 10_000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
 
-export async function POST(request:NextRequest) {
-    const cookie = request.headers.get('cookie') || "";
-    const response = await fetch(`${BACKEND_URL}/signout`,{
-        method:"POST",
-        headers:{Cookie:cookie}
+  try {
+    const cookie = request.headers.get("cookie") || "";
+    const response = await fetch(`${BACKEND_URL}/signout`, {
+      method: "POST",
+      headers: { Cookie: cookie },
+      signal: controller.signal,
     });
 
-    const setCookie = response.headers.get('set-cookie');
+    const allCookies = response.headers.getSetCookie();
 
-    const headers : Record<string,string>={}
+    const headers = new Headers();
 
-    if(setCookie){
-        headers['Set-Cookie'] = setCookie;
+    for (const cookie in allCookies) {
+      headers.append("Set-Cookie", cookie);
     }
 
-    return new Response(null,{status:response.status,headers})
+    return new Response(JSON.stringify(null), { status: response.status, headers });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return new Response(
+        JSON.stringify({ error: "Backend request time out " }),
+        { status: 504, headers: { "Content-Type": "applicaton/json" } },
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
