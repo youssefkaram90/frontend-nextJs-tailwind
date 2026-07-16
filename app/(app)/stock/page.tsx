@@ -1,9 +1,9 @@
 import React from 'react'
 
-function stock() {
+export default function Stock() {
   return (
     <div>stock</div>
   )
 }
 
-export default stock
+ 

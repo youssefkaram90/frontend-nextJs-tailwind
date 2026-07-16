@@ -28,7 +28,7 @@ export default function Signin() {
       setError(
         err instanceof Error
           ? err.message
-          : "Invalide Credentials. Please try again.",
+          : "Invalid Credentials. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -56,7 +56,7 @@ export default function Signin() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcom Back</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>
 
@@ -102,7 +102,7 @@ export default function Signin() {
             />
           </div>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               <span className="font-medium">Error:</span> {error}
             </div>
           )}
