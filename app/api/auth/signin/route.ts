@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { env } from "@/app/lib/env";
 
-const BACKEND_URL =env.BACKEND_URL;
+const BACKEND_URL = env.BACKEND_URL;
 
 export async function POST(request: NextRequest) {
   const BACKEND_TIMEOUT_MS = 10_000;
@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
 
     const headers = new Headers();
 
-    for(const cookie in allCookies){
-        headers.append('Set-Cookie',cookie)
+    for (const cookie of allCookies) {
+      headers.append("Set-Cookie", cookie);
     }
-    
+
     return new Response(JSON.stringify(data), {
       status: response.status,
       headers,
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return new Response(
         JSON.stringify({ error: "Backend request time out " }),
-        { status: 504, headers: { "Content-Type": "applicaton/json" } },
+        { status: 504, headers: { "Content-Type": "application/json" } },
       );
     }
     throw error;
