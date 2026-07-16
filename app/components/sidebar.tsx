@@ -1,5 +1,4 @@
-
-"use client"
+"use client";
 import { useEffect, useState } from "react";
 import {
   X,
@@ -11,13 +10,21 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-interface navProps {
-  navState: boolean;
+interface NavbarProps {
+  navOpen: boolean;
+  onClose:()=>void;
 }
 
-function Sidebar({ navState }: navProps) {
-  const [navOpen, setNavOpen] = useState(false);
+function Sidebar({ navOpen ,onClose}: NavbarProps) {
   const [dark, setDark] = useState(false);
+
+  const toggleDarkMode = ()=>{
+    setDark((current)=>{
+      const next = !current;
+      document.documentElement.classList.toggle("dark",next);
+      return next;
+    });
+  };
 
   const navItems = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboardIcon },
@@ -25,16 +32,9 @@ function Sidebar({ navState }: navProps) {
     { name: "Stock", path: "/stock", icon: Warehouse },
   ];
 
-  useEffect(() => {
-    setNavOpen(true);
-  }, [navState]);
+
   return (
-
-
-
-
-
-        <nav
+    <nav
       className={`
         fixed bg-white w-64 h-screen shadow z-50 transition-transform duration-300
         ${navOpen ? "translate-x-0" : "-translate-x-64"}
@@ -44,9 +44,7 @@ function Sidebar({ navState }: navProps) {
         <div className="text-xl font-bold">Logo</div>
         <button
           className="lg:hidden"
-          onClick={() => {
-            setNavOpen(false);
-          }}
+          onClick={onClose}
         >
           <X />
         </button>
@@ -68,21 +66,17 @@ function Sidebar({ navState }: navProps) {
         })}
 
         <div className="flex text-2xl justify-center">
-          {dark ? (
-            <button
-              onClick={() => setDark(false)}
-              className="p-2 bg-white rounded-full"
-            >
-              <Sun className="text-black" />
-            </button>
-          ) : (
-            <button
-              onClick={() => setDark(true)}
-              className="p-2 bg-black rounded-full"
-            >
-              <Moon className="text-white" />
-            </button>
-          )}
+          <button onClick={toggleDarkMode}
+          className="p-2 bg-whit dark:bg-black rounded-full">
+            {
+              dark ? (
+                <Sun className="text-black dark:text-white"/>
+              ):(
+                <Moon className="text-black"/>
+              )
+            }
+
+          </button>
         </div>
       </div>
     </nav>

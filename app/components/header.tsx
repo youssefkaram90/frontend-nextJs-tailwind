@@ -1,15 +1,14 @@
 import { Menu } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 
-interface setNavProps {
-  setNavState: Dispatch<SetStateAction<boolean>>;
-  navState: boolean;
+interface HeaderProps {
+  onMenuClick:()=>void;
 }
 
-export default function Header({ setNavState ,navState}: setNavProps) {
+export default function Header({ onMenuClick}: HeaderProps) {
   return (
     <header className="flex justify-between bg-white p-4">
-      <button onClick={() => setNavState(!navState)}>
+      <button onClick={onMenuClick}>
         <Menu className="font-bold lg:hidden" size={24} />
       </button>
       <div className="text-2xl font-bold ">dashboard</div>
