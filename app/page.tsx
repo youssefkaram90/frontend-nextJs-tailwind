@@ -6,7 +6,7 @@ export default async function home(){
     const token = cookieStore.get('Authentication');
 
     if(token){
-        redirect('dashboard');
+        redirect('/dashboard');
     }
 
     redirect('/signin')

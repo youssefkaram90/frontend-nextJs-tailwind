@@ -1,9 +1,9 @@
 import React from 'react'
 
-function deliveries() {
+export default function Deliveries() {
   return (
     <div>deliveries</div>
   )
 }
 
-export default deliveries
+ 
