@@ -1,4 +1,5 @@
-"use client";
+
+"use client"
 import { useEffect, useState } from "react";
 import {
   X,
@@ -28,9 +29,14 @@ function Sidebar({ navState }: navProps) {
     setNavOpen(true);
   }, [navState]);
   return (
-    <nav
+
+
+
+
+
+        <nav
       className={`
-        fixed bg-white w-64 h-screen shadow 
+        fixed bg-white w-64 h-screen shadow z-50 transition-transform duration-300
         ${navOpen ? "translate-x-0" : "-translate-x-64"}
        lg:translate-x-0  `}
     >
