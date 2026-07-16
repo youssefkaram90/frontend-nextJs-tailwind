@@ -5,7 +5,7 @@ export interface SigninDto {
     password:string;
 }
 
-export async function singin(signinDto :SigninDto ){
+export async function signin(signinDto :SigninDto ){
     return api(
         '/api/auth/signin',
         {
