@@ -1,16 +1,15 @@
-import { error } from "console";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ||"";
 
 export async function api<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_URL}${endpoint}`, {
+
+  const url = endpoint.startsWith("/api/") ? endpoint : `${API_URL}${endpoint}`
+  const response = await fetch(url, {
     ...options,
-    credentials: "include",
     headers: {
-      "Contrnt-type": "application/json",
+      "Content-Type": "application/json",
       ...options.headers,
     },
   });
