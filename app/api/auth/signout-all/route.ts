@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}/signout`, {
+    const response = await fetch(`${BACKEND_URL}/auth/logout-all`, {
       method: "POST",
       headers: { Cookie: cookie },
       signal: controller.signal,
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return new Response(
-        JSON.stringify({ error: "Backend request time out " }),
+        JSON.stringify({ error: "Backend request time out" }),
         { status: 504, headers: { "Content-Type": "application/json" } },
       );
     }

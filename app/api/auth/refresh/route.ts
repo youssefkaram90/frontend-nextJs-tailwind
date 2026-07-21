@@ -10,11 +10,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}/signout`, {
+    const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
       method: "POST",
       headers: { Cookie: cookie },
       signal: controller.signal,
     });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
 
     const allCookies = response.headers.getSetCookie();
 
@@ -24,14 +27,14 @@ export async function POST(request: NextRequest) {
       headers.append("Set-Cookie", cookie);
     }
 
-    return new Response(JSON.stringify(null), {
+    return new Response(JSON.stringify(data), {
       status: response.status,
       headers,
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return new Response(
-        JSON.stringify({ error: "Backend request time out " }),
+        JSON.stringify({ message: "Backend request time out" }),
         { status: 504, headers: { "Content-Type": "application/json" } },
       );
     }
