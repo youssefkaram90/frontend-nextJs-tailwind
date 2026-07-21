@@ -17,7 +17,14 @@ export async function POST(request: NextRequest) {
     });
 
     const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
+    if(!text){
+        return new Response(JSON.stringify(
+            {messagee:"Empty refresh token"}),
+            {status:500,headers:{"Content-Type":"application/json"}}
+        );
+    }
+
+    const data = JSON.parse(text);
 
     const allCookies = response.headers.getSetCookie();
 

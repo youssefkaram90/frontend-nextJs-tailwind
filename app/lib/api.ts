@@ -38,7 +38,7 @@ export async function api<T>(
     },
   });
 
-  if (response.status === 401 && !endpoint.includes("/auth/")) {
+  if (response.status === 401 && !endpoint.startsWith("/api/auth/")) {
     const refreshed = await attemptRefresh();
     if (refreshed) {
       response = await fetch(url, {
