@@ -13,3 +13,10 @@ export async function signin(signinDto :SigninDto ){
         body:JSON.stringify(signinDto),
     });
 }
+
+export async function refreshToken() {
+    return api<{ accessToken: string; refreshToken: string }>(
+        '/api/auth/refresh',
+        { method: "POST" }
+    );
+}
