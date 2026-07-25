@@ -6,7 +6,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createSowing } from "@/app/lib/services/sowing";
-import { FieldLocation } from "@/app/lib/types/sowing";
+import { FieldLocation, CreateSowingDto } from "@/app/lib/types/sowing";
 import { ProductType, StockType } from "@/app/lib/types/delivery";
 import { ArrowLeft, Info } from "lucide-react";
 
@@ -26,7 +26,8 @@ const createSowingSchema = z
     stockType: z.enum(["BIO", "CVT"], {
       message: "Stock type is required",
     }),
-    numberOfTrays: z.coerce.number().int().min(1).default(1),
+    numberOfTrays: z.coerce.number().int().min(0).optional(),
+    seedsPerTray: z.coerce
     seedsPerTray: z.coerce
       .number()
       .int()
@@ -42,10 +43,16 @@ const createSowingSchema = z
       }
       return (data.quantityUsed ?? 0) > 0;
     },
-    {
-      message: "Please enter number of trays (Greenhouse) or quantity (Field)",
-      path: ["greenhouse"],
-    },
+    (data) => ({
+      message:
+        data.greenhouse === "GREENHOUSE"
+          ? "Number of trays is required"
+          : "Quantity used is required",
+      path:
+        data.greenhouse === "GREENHOUSE"
+          ? ["numberOfTrays"]
+          : ["quantityUsed"],
+    }),
   );
 
 type CreateSowingFormData = z.input<typeof createSowingSchema>;
@@ -96,7 +103,7 @@ export default function CreateSowingPage() {
     setServerError(null);
 
     try {
-      const sowingDto: any = {
+      const sowingDto: CreateSowingDto = {
         cropType: data.cropType,
         sowingDate: new Date(data.sowingDate),
         greenhouse: data.greenhouse as FieldLocation,

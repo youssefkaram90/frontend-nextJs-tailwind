@@ -1,7 +1,7 @@
 export enum UserRole {
-  ADMIN = 'ADMIN',
-  MANAGER = 'MANAGER',
-  USER = 'USER',
+  ADMIN = "ADMIN",
+  MANAGER = "MANAGER",
+  USER = "USER",
 }
 
 export interface Permission {
@@ -13,7 +13,7 @@ export interface Permission {
 export interface User {
   id: string;
   name: string;
-  role: string;
+  role: UserRole;
   lastName: string | null;
   createdAt: string;
   updatedAt: string;

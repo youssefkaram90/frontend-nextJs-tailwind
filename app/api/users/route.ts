@@ -66,9 +66,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
-  const url = new URL(request.url);
-  const backendPath = `/users${url.pathname.replace('/api/users', '')}`;
-  return proxyRequest(request, backendPath, {
+  return proxyRequest(request, "/users", {
     method: "PATCH",
     body: JSON.stringify(body),
   });

@@ -1,8 +1,8 @@
-import { api } from '../api';
-import type { Sowing, CreateSowingDto } from '../types/sowing';
+import { api } from "../api";
+import type { Sowing, CreateSowingDto } from "../types/sowing";
 
 export async function getSowings(): Promise<Sowing[]> {
-  return api<Sowing[]>('/api/sowing');
+  return api<Sowing[]>("/api/sowing");
 }
 
 export async function getSowing(id: string): Promise<Sowing> {
@@ -10,21 +10,36 @@ export async function getSowing(id: string): Promise<Sowing> {
 }
 
 export async function createSowing(dto: CreateSowingDto): Promise<Sowing> {
-  return api<Sowing>('/api/sowing', {
-    method: 'POST',
-    body: JSON.stringify(dto),
+  return api<Sowing>("/api/sowing", {
+    method: "POST",
+    body: JSON.stringify({
+      ...dto,
+      sowingDate:
+        dto.sowingDate instanceof Date
+          ? dto.sowingDate.toLocaleDateString("en-CA")
+          : dto.sowingDate,
+    }),
   });
 }
 
-export async function updateSowing(id: string, dto: CreateSowingDto): Promise<Sowing> {
+export async function updateSowing(
+  id: string,
+  dto: CreateSowingDto,
+): Promise<Sowing> {
   return api<Sowing>(`/api/sowing/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(dto),
+    method: "PATCH",
+    body: JSON.stringify({
+      ...dto,
+      sowingDate:
+        dto.sowingDate instanceof Date
+          ? dto.sowingDate.toLocaleDateString("en-CA")
+          : dto.sowingDate,
+    }),
   });
 }
 
 export async function deleteSowing(id: string): Promise<void> {
   await api<void>(`/api/sowing/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }

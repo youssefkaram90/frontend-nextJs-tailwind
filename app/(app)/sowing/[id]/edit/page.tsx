@@ -26,7 +26,7 @@ const editSowingSchema = z
     stockType: z.enum(["BIO", "CVT"], {
       message: "Stock type is required",
     }),
-    numberOfTrays: z.coerce.number().int().min(1).default(1),
+    numberOfTrays: z.coerce.number().int().min(0).optional(),
     seedsPerTray: z.coerce
       .number()
       .int()
@@ -42,10 +42,14 @@ const editSowingSchema = z
       }
       return (data.quantityUsed ?? 0) > 0;
     },
-    {
-      message: "Please enter number of trays (Greenhouse) or quantity (Field)",
-      path: ["greenhouse"],
-    },
+    (data) => ({
+      message:
+        data.greenhouse === "GREENHOUSE"
+          ? "Number of trays is required"
+          : "Quantity used is required",
+      path:
+        data.greenhouse === "GREENHOUSE" ? ["numberOfTrays"] : ["quantityUsed"],
+    }),
   );
 
 type EditSowingFormData = z.input<typeof editSowingSchema>;
@@ -98,39 +102,24 @@ export default function EditSowingPage() {
     async function load() {
       try {
         const sowing = await getSowing(id);
-        if (sowing.numberOfTrays) {
-          // Greenhouse sowing
-          reset({
-            cropType: sowing.cropType,
-            sowingDate: sowing.sowingDate
-              ? new Date(sowing.sowingDate).toISOString().split("T")[0]
-              : "",
-            greenhouse: sowing.greenhouse as "GREENHOUSE" | "FIELD",
-            lotNumber: sowing.lotNumber,
-            productType: sowing.productType as "SEEDS" | "PEAT",
-            stockType: sowing.stockType as "BIO" | "CVT",
-            numberOfTrays: sowing.numberOfTrays,
-            seedsPerTray: sowing.seedsPerTray ?? DEFAULT_SEEDS_PER_TRAY,
-            quantityUsed: 0,
-            remarks: sowing.remarks ?? "",
-          });
-        } else {
-          // Field sowing
-          reset({
-            cropType: sowing.cropType,
-            sowingDate: sowing.sowingDate
-              ? new Date(sowing.sowingDate).toISOString().split("T")[0]
-              : "",
-            greenhouse: sowing.greenhouse as "GREENHOUSE" | "FIELD",
-            lotNumber: sowing.lotNumber,
-            productType: sowing.productType as "SEEDS" | "PEAT",
-            stockType: sowing.stockType as "BIO" | "CVT",
-            numberOfTrays: undefined,
-            seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
-            quantityUsed: sowing.quantityUsed,
-            remarks: sowing.remarks ?? "",
-          });
-        }
+        const base = {
+          cropType: sowing.cropType,
+          sowingDate: sowing.sowingDate
+            ? new Date(sowing.sowingDate).toISOString().split("T")[0]
+            : "",
+          greenhouse: sowing.greenhouse as "GREENHOUSE" | "FIELD",
+          lotNumber: sowing.lotNumber,
+          productType: sowing.productType as "SEEDS" | "PEAT",
+          stockType: sowing.stockType as "BIO" | "CVT",
+          remarks: sowing.remarks ?? "",
+        };
+
+        reset({
+          ...base,
+          numberOfTrays: sowing.numberOfTrays ?? undefined,
+          seedsPerTray: sowing.seedsPerTray ?? DEFAULT_SEEDS_PER_TRAY,
+          quantityUsed: sowing.quantityUsed ?? 0,
+        });
       } catch (err) {
         setServerError(
           err instanceof Error ? err.message : "Failed to load sowing record",

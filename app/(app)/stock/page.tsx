@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getStockItems, getStockSummary } from "@/app/lib/services/stock";
 import type { StockItem, StockSummary } from "@/app/lib/types/stock";
 
 export default function StockPage() {
+  const router = useRouter();
   const [items, setItems] = useState<StockItem[]>([]);
   const [summary, setSummary] = useState<StockSummary>({});
   const [loading, setLoading] = useState(true);
@@ -137,7 +139,15 @@ export default function StockPage() {
                   <tr
                     key={item.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition duration-150 cursor-pointer"
-                    onClick={() => (window.location.href = `/stock/${item.id}`)}
+                    tabIndex={0}
+                    role="row"
+                    onClick={() => router.push(`/stock/${item.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/stock/${item.id}`);
+                      }
+                    }}
                   >
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                       {item.lotNumber}

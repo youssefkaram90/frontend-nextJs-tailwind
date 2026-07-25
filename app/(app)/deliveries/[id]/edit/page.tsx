@@ -6,6 +6,7 @@ import { z } from "zod/v3";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getDelivery, updateDelivery } from "@/app/lib/services/deliveries";
+import { useToast } from "@/app/lib/toast-context";
 import { StockType, ProductType } from "@/app/lib/types/delivery";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
@@ -29,7 +30,32 @@ const lotSchema = z.object({
 const editDeliverySchema = z.object({
   deliveryCode: z.string().min(1, "Delivery code is required"),
   deliveryDate: z.string().min(1, "Delivery date is required"),
-  lots: z.array(lotSchema).min(1, "At least one lot is required"),
+  lots: z
+    .array(lotSchema)
+    .min(1, "At least one lot is required")
+    .superRefine((lots, ctx) => {
+      const seen = new Map<string, number>();
+      lots.forEach((lot, i) => {
+        const num = lot.lotNumber.trim();
+        if (!num) return;
+        const lower = num.toLowerCase();
+        if (seen.has(lower)) {
+          const msg = `Duplicate lot number "${num}"`;
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: msg,
+            path: [i, "lotNumber"],
+          });
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: msg,
+            path: [seen.get(lower)!, "lotNumber"],
+          });
+        } else {
+          seen.set(lower, i);
+        }
+      });
+    }),
 });
 
 type EditDeliveryFormData = z.infer<typeof editDeliverySchema>;
@@ -38,6 +64,7 @@ export default function EditDeliveryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -67,6 +94,8 @@ export default function EditDeliveryPage() {
     },
   });
 
+  const { showToast } = useToast();
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: "lots",
@@ -94,6 +123,7 @@ export default function EditDeliveryPage() {
         setServerError(
           err instanceof Error ? err.message : "Failed to load delivery",
         );
+        setLoadFailed(true);
       } finally {
         setLoading(false);
       }
@@ -125,6 +155,7 @@ export default function EditDeliveryPage() {
       };
 
       await updateDelivery(id, payload);
+      showToast("Delivery updated successfully!", "success");
       router.push(`/deliveries/${id}`);
     } catch (err) {
       setServerError(
@@ -139,6 +170,23 @@ export default function EditDeliveryPage() {
     return (
       <div className="p-4 flex items-center justify-center h-64">
         <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="p-4">
+        <button
+          onClick={() => router.push(`/deliveries/${id}`)}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition mb-4"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Delivery
+        </button>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {serverError || "Failed to load delivery"}
+        </div>
       </div>
     );
   }

@@ -17,14 +17,22 @@ export async function POST(request: NextRequest) {
     });
 
     const text = await response.text();
-    if(!text){
-        return new Response(JSON.stringify(
-            {message:"Empty refresh token"}),
-            {status:500,headers:{"Content-Type":"application/json"}}
-        );
+    if (!text) {
+      return new Response(JSON.stringify({ message: "Empty refresh token" }), {
+        status: response.status || 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const data = JSON.parse(text);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return new Response(
+        JSON.stringify({ message: "Invalid response from server" }),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     const allCookies = response.headers.getSetCookie();
 

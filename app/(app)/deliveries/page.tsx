@@ -107,9 +107,14 @@ export default function DeliveriesPage() {
                     <tr
                       key={delivery.id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition duration-150 cursor-pointer"
-                      onClick={() =>
-                        (window.location.href = `/deliveries/${delivery.id}`)
-                      }
+                      tabIndex={0}
+                      onClick={() => router.push(`/deliveries/${delivery.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/deliveries/${delivery.id}`);
+                        }
+                      }}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
                         {new Date(delivery.deliveryDate).toLocaleDateString(
@@ -121,14 +126,11 @@ export default function DeliveriesPage() {
                           },
                         )}
                       </td>
-                       <td className="px-6 py-4">
-                        <span
-                          className="inline-block px-2 py-0.5 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300"
-                        >
+                      <td className="px-6 py-4">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300">
                           {delivery.deliveryCode}
                         </span>
                       </td>
-                       
 
                       <td className="px-6 py-4 text-right text-gray-700 dark:text-gray-300">
                         {delivery.lots.length}

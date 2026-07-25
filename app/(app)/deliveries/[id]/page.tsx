@@ -68,22 +68,10 @@ export default function DeliveryDetailPage() {
 
   if (!delivery) return null;
 
-  // ... rest of the component
   const totalQuantity = delivery.lots.reduce(
     (sum, lot) => sum + lot.quantity,
     0,
   );
-
-  {
-    /**
-    
-    const stockBadgeColor =
-    delivery.lots. === "BIO"
-      ? "bg-blue-100 text-green-800"
-      : "bg-purple-100 text-gray-800";
-
-    */
-  }
 
   return (
     <div className="p-4 space-y-6">
@@ -98,8 +86,16 @@ export default function DeliveryDetailPage() {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl max-w-md mx-4 w-full">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl max-w-md mx-4 w-full"
+          >
+            <h3
+              id="delete-dialog-title"
+              className="text-lg font-bold text-gray-900 dark:text-white mb-2"
+            >
               Delete Delivery?
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
@@ -251,7 +247,7 @@ export default function DeliveryDetailPage() {
                   <td className="px-6 py-6">
                     <span
                       className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium  ${
-                        lot.stockType === "CVT "
+                        lot.stockType === "CVT"
                           ? "bg-gray-100 text-gray-800"
                           : "bg-green-100 text-green-800"
                       }`}

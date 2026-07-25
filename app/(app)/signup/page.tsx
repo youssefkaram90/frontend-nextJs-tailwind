@@ -179,9 +179,11 @@ export default function SignupPage() {
                   bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
               >
-                <option value="USER">User</option>
-                <option value="MANAGER">Manager</option>
-                <option value="ADMIN">Admin</option>
+                {Object.values(UserRole).map((role) => (
+                  <option key={role} value={role}>
+                    {role.charAt(0) + role.slice(1).toLowerCase()}
+                  </option>
+                ))}
               </select>
               {errors.role && (
                 <p className="mt-1 text-xs text-red-600">

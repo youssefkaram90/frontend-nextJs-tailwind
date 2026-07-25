@@ -152,7 +152,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3">
                         <Truck className="h-4 w-4 text-gray-400" />
                         <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {delivery.stockType}
+                          {delivery.deliveryCode}
                         </span>
                       </div>
                       <div className="text-right text-sm text-gray-500 dark:text-gray-400">
