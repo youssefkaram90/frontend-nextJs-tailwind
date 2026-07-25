@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import {
-  X,
-  LayoutDashboardIcon,
+    LayoutDashboardIcon,
   Warehouse,
   Truck,
+  Sprout,
+  Users,
   Moon,
   Sun,
 } from "lucide-react";
@@ -21,10 +22,12 @@ function Sidebar() {
     });
   };
 
-  const navItems = [
+    const navItems = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboardIcon },
     { name: "Deliveries", path: "/deliveries", icon: Truck },
+    { name: "Sowing", path: "/sowing", icon: Sprout },
     { name: "Stock", path: "/stock", icon: Warehouse },
+    { name: "Users", path: "/users", icon: Users },
   ];
 
   return (

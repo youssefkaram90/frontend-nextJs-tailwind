@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}/signout`, {
+    const response = await fetch(`${BACKEND_URL}/auth/signout`, {
       method: "POST",
       headers: { Cookie: cookie },
       signal: controller.signal,
