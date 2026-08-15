@@ -1,36 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getStockItem } from "@/app/lib/services/stock";
-import type { StockItem } from "@/app/lib/types/stock";
+import { useStockItem } from "@/app/lib/hooks/use-stock";
 import { ArrowLeft, Package } from "lucide-react";
 import { DetailCardSkeleton, TableSkeleton } from "@/app/components/skeleton";
+
+const formatQty = (value: number, isPeat: boolean) =>
+  isPeat ? value.toFixed(2) : value.toLocaleString();
 
 export default function StockDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [item, setItem] = useState<StockItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: item, isPending, error } = useStockItem(id);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getStockItem(id);
-        setItem(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load stock item",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [id]);
-
-  if (loading) {
+  if (isPending) {
     return (
       <div className="p-4 space-y-6">
         <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -44,7 +27,7 @@ export default function StockDetailPage() {
     return (
       <div className="p-4">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error || "Stock item not found"}
+          {error.message || "Stock item not found"}
         </div>
       </div>
     );
@@ -105,7 +88,7 @@ export default function StockDetailPage() {
               Current Quantity
             </p>
             <p className="text-3xl font-bold text-gray-900 dark:text-white">
-              {item.currentQuantity}
+              {formatQty(item.currentQuantity, item.productType === "PEAT")}
             </p>
           </div>
         </div>
@@ -154,8 +137,11 @@ export default function StockDetailPage() {
                           : "text-red-600"
                       }`}
                     >
-                      {movement.quantity > 0 ? "+" : ""}
-                      {movement.quantity}
+                      {movement.quantity > 0 ? "+" : "-"}
+                      {formatQty(
+                        Math.abs(movement.quantity),
+                        item.productType === "PEAT",
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span

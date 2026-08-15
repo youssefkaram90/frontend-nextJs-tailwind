@@ -1,34 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDeliveries } from "@/app/lib/services/deliveries";
-import type { Delivery } from "@/app/lib/types/delivery";
-import { Plus } from "lucide-react";
+import { useDeliveries } from "@/app/lib/hooks/use-deliveries";
+import { Plus, Search } from "lucide-react";
+import { useSearch } from "@/app/lib/use-search";
 
 export default function DeliveriesPage() {
   const router = useRouter();
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { query, setQuery, debouncedQuery } = useSearch();
+  const {
+    data: deliveries = [],
+    isPending,
+    error,
+  } = useDeliveries(debouncedQuery || undefined);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getDeliveries();
-        setDeliveries(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load deliveries",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
-
-  if (loading) {
+  if (isPending) {
     return (
       <div className="p-4">
         <div className="flex items-center justify-center h-64">
@@ -42,7 +28,7 @@ export default function DeliveriesPage() {
     return (
       <div className="p-4">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
+          {error.message}
         </div>
       </div>
     );
@@ -70,6 +56,18 @@ export default function DeliveriesPage() {
         </button>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search deliveries by code, product, lot, supplier…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+        />
+      </div>
+
       {/* Deliveries Table */}
       <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -92,17 +90,18 @@ export default function DeliveriesPage() {
                     Delivery Code
                   </th>
                   <th className="px-6 py-3 text-right font-medium">Lots</th>
-                  <th className="px-6 py-3 text-right font-medium">
-                    Total Quantity
-                  </th>
+                  <th className="px-6 py-3 text-right font-medium">Seeds</th>
+                  <th className="px-6 py-3 text-right font-medium">Peat</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {deliveries.map((delivery) => {
-                  const totalQty = delivery.lots.reduce(
-                    (sum, lot) => sum + lot.quantity,
-                    0,
-                  );
+                  const seedsTotal = delivery.lots
+                    .filter((l) => l.productType === "SEEDS")
+                    .reduce((sum, lot) => sum + lot.quantity, 0);
+                  const peatTotal = delivery.lots
+                    .filter((l) => l.productType === "PEAT")
+                    .reduce((sum, lot) => sum + lot.quantity, 0);
                   return (
                     <tr
                       key={delivery.id}
@@ -136,7 +135,10 @@ export default function DeliveriesPage() {
                         {delivery.lots.length}
                       </td>
                       <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
-                        {totalQty}
+                        {seedsTotal > 0 ? seedsTotal.toLocaleString() : "—"}
+                      </td>
+                      <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
+                        {peatTotal > 0 ? peatTotal.toFixed(2) : "—"}
                       </td>
                     </tr>
                   );

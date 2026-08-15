@@ -1,52 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getDelivery, deleteDelivery } from "@/app/lib/services/deliveries";
-import type { Delivery } from "@/app/lib/types/delivery";
+import { useDelivery, useDeleteDelivery } from "@/app/lib/hooks/use-deliveries";
 import { ArrowLeft, Truck, Pencil, Trash2 } from "lucide-react";
 import { DetailCardSkeleton, TableSkeleton } from "@/app/components/skeleton";
 
 export default function DeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [delivery, setDelivery] = useState<Delivery | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: delivery, isPending, error } = useDelivery(id);
+  const deleteDelivery = useDeleteDelivery();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getDelivery(id);
-        setDelivery(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load delivery",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [id]);
 
   async function handleDelete() {
     setDeleting(true);
     try {
-      await deleteDelivery(id);
+      await deleteDelivery.mutateAsync(id);
       router.push("/deliveries");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete delivery",
-      );
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
   }
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="p-4 space-y-6">
         <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -68,10 +47,12 @@ export default function DeliveryDetailPage() {
 
   if (!delivery) return null;
 
-  const totalQuantity = delivery.lots.reduce(
-    (sum, lot) => sum + lot.quantity,
-    0,
-  );
+  const seedsTotal = delivery.lots
+    .filter((l) => l.productType === "SEEDS")
+    .reduce((sum, lot) => sum + lot.quantity, 0);
+  const peatTotal = delivery.lots
+    .filter((l) => l.productType === "PEAT")
+    .reduce((sum, lot) => sum + lot.quantity, 0);
 
   return (
     <div className="p-4 space-y-6">
@@ -160,8 +141,15 @@ export default function DeliveryDetailPage() {
               })}
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              {delivery.lots.length} lot{delivery.lots.length !== 1 ? "s" : ""},{" "}
-              {totalQuantity} total
+              {delivery.lots.length} lot{delivery.lots.length !== 1 ? "s" : ""}
+              {seedsTotal > 0 && (
+                <span className="ml-2">
+                  Seeds: {seedsTotal.toLocaleString()}
+                </span>
+              )}
+              {peatTotal > 0 && (
+                <span className="ml-2">Peat: {peatTotal.toFixed(2)}</span>
+              )}
             </p>
           </div>
         </div>
@@ -193,9 +181,12 @@ export default function DeliveryDetailPage() {
       {/* Lots Table */}
       <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Lots
-          </h2>
+          <div className="flex justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Lots
+            </h2>
+            <p className="text-right">Remark : {delivery.remark}</p>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -214,7 +205,6 @@ export default function DeliveryDetailPage() {
                 <th className="px-6 py-3 text-right font-medium">Quantity</th>
                 <th className="px-6 py-3 text-left font-medium">Supplier</th>
                 <th className="px-6 py-3 text-right font-medium">TSPG</th>
-                <th className="px-6 py-3 text-left font-medium">Remark</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -236,7 +226,7 @@ export default function DeliveryDetailPage() {
                       className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                         lot.productType === "SEEDS"
                           ? "bg-amber-100 text-amber-800"
-                          : "bg-emerald-100 text-emerald-800"
+                          : "bg-blue-100 text-blue-800"
                       }`}
                     >
                       {lot.productType}
@@ -266,10 +256,6 @@ export default function DeliveryDetailPage() {
                   {/**thousand seeds per gram */}
                   <td className="px-6 py-4 text-right text-gray-700 dark:text-gray-300">
                     {lot.thousandSeedsPerGram ?? "—"}
-                  </td>
-                  {/**Remark  */}
-                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400 max-w-[200px] truncate">
-                    {lot.remark || "—"}
                   </td>
                 </tr>
               ))}

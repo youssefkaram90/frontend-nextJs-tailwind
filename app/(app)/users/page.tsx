@@ -1,33 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUsers } from "@/app/lib/services/users";
-import type { User } from "@/app/lib/types/user";
-import { Users, Plus, Shield, ShieldOff } from "lucide-react";
+import { useUsers } from "@/app/lib/hooks/use-users";
+import { Users, Plus, Shield, ShieldOff, Search } from "lucide-react";
 import { TableSkeleton } from "@/app/components/skeleton";
+import { useSearch } from "@/app/lib/use-search";
 
 export default function UsersPage() {
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { query, setQuery, debouncedQuery } = useSearch();
+  const {
+    data: users = [],
+    isPending,
+    error,
+  } = useUsers(debouncedQuery || undefined);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getUsers();
-        setUsers(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load users");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
-
-  if (loading) {
+  if (isPending) {
     return (
       <div className="p-4 space-y-6">
         <div className="flex items-center justify-between">
@@ -45,7 +33,7 @@ export default function UsersPage() {
     return (
       <div className="p-4">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
+          {error.message}
         </div>
       </div>
     );
@@ -71,6 +59,18 @@ export default function UsersPage() {
           <Plus className="h-4 w-4" />
           New User
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search users by name, last name, role…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+        />
       </div>
 
       {/* Users Table */}
@@ -115,8 +115,8 @@ export default function UsersPage() {
                           user.role === "ADMIN"
                             ? "bg-purple-100 text-purple-800"
                             : user.role === "MANAGER"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
                         }`}
                       >
                         {user.role === "ADMIN" || user.role === "MANAGER" ? (
@@ -144,5 +144,3 @@ export default function UsersPage() {
     </div>
   );
 }
-
-

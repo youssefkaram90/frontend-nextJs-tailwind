@@ -2,23 +2,12 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod/v3";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createUser } from "@/app/lib/services/users";
 import { UserRole } from "@/app/lib/types/user";
 import { ArrowLeft } from "lucide-react";
-
-const signupSchema = z.object({
-  name: z.string().min(1, "Username is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  lastName: z.string().optional(),
-  role: z.enum(["ADMIN", "MANAGER", "USER"], {
-    required_error: "Role is required",
-  }),
-});
-
-type SignupFormData = z.infer<typeof signupSchema>;
+import { signupSchema, type SignupFormData } from "@/app/schemas/auth.schema";
 
 export default function SignupPage() {
   const router = useRouter();

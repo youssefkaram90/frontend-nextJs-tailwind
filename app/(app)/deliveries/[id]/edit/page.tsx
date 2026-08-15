@@ -2,69 +2,22 @@
 
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod/v3";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getDelivery, updateDelivery } from "@/app/lib/services/deliveries";
+import { updateDelivery } from "@/app/lib/services/deliveries";
+import { useDelivery } from "@/app/lib/hooks/use-deliveries";
 import { useToast } from "@/app/lib/toast-context";
 import { StockType, ProductType } from "@/app/lib/types/delivery";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-
-const lotSchema = z.object({
-  stockType: z.enum(["BIO", "CVT"], {
-    required_error: "Stock type is required",
-  }),
-  lotNumber: z.string().min(1, "Lot number is required"),
-  quantity: z.coerce.number().int().positive("Quantity must be positive"),
-  productType: z.enum(["SEEDS", "PEAT"], {
-    required_error: "Product type is required",
-  }),
-  productName: z.string().min(1, "Product name is required"),
-  supplierName: z.string().min(1, "Supplier name is required"),
-  thousandSeedsPerGram: z
-    .union([z.coerce.number().positive(), z.literal("")])
-    .optional(),
-  remark: z.string().optional(),
-});
-
-const editDeliverySchema = z.object({
-  deliveryCode: z.string().min(1, "Delivery code is required"),
-  deliveryDate: z.string().min(1, "Delivery date is required"),
-  lots: z
-    .array(lotSchema)
-    .min(1, "At least one lot is required")
-    .superRefine((lots, ctx) => {
-      const seen = new Map<string, number>();
-      lots.forEach((lot, i) => {
-        const num = lot.lotNumber.trim();
-        if (!num) return;
-        const lower = num.toLowerCase();
-        if (seen.has(lower)) {
-          const msg = `Duplicate lot number "${num}"`;
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: msg,
-            path: [i, "lotNumber"],
-          });
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: msg,
-            path: [seen.get(lower)!, "lotNumber"],
-          });
-        } else {
-          seen.set(lower, i);
-        }
-      });
-    }),
-});
-
-type EditDeliveryFormData = z.infer<typeof editDeliverySchema>;
+import {
+  editDeliverySchema,
+  type EditDeliveryFormData,
+} from "@/app/schemas/delivery.schema";
 
 export default function EditDeliveryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const { data: delivery, isPending, error: loadError } = useDelivery(id);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -102,34 +55,22 @@ export default function EditDeliveryPage() {
   });
 
   useEffect(() => {
-    async function load() {
-      try {
-        const delivery = await getDelivery(id);
-        reset({
-          deliveryCode: delivery.deliveryCode,
-          deliveryDate: delivery.deliveryDate.split("T")[0],
-          lots: delivery.lots.map((lot) => ({
-            stockType: lot.stockType as "BIO" | "CVT",
-            lotNumber: lot.lotNumber,
-            quantity: lot.quantity,
-            productType: lot.productType as "SEEDS" | "PEAT",
-            productName: lot.productName,
-            supplierName: lot.supplierName,
-            thousandSeedsPerGram: lot.thousandSeedsPerGram ?? "",
-            remark: lot.remark ?? "",
-          })),
-        });
-      } catch (err) {
-        setServerError(
-          err instanceof Error ? err.message : "Failed to load delivery",
-        );
-        setLoadFailed(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [id, reset]);
+    if (!delivery) return;
+    reset({
+      deliveryCode: delivery.deliveryCode,
+      deliveryDate: delivery.deliveryDate.split("T")[0],
+      lots: delivery.lots.map((lot) => ({
+        stockType: lot.stockType as "BIO" | "CVT",
+        lotNumber: lot.lotNumber,
+        quantity: lot.quantity,
+        productType: lot.productType as "SEEDS" | "PEAT",
+        productName: lot.productName,
+        supplierName: lot.supplierName,
+        thousandSeedsPerGram: lot.thousandSeedsPerGram ?? "",
+        remark: lot.remark ?? "",
+      })),
+    });
+  }, [delivery, reset]);
 
   async function onSubmit(data: EditDeliveryFormData) {
     setSubmitting(true);
@@ -142,7 +83,7 @@ export default function EditDeliveryPage() {
         lots: data.lots.map((lot) => ({
           stockType: lot.stockType as StockType,
           lotNumber: lot.lotNumber,
-          quantity: lot.quantity,
+          quantity: Number(lot.quantity),
           productType: lot.productType as ProductType,
           productName: lot.productName,
           supplierName: lot.supplierName,
@@ -166,7 +107,7 @@ export default function EditDeliveryPage() {
     }
   }
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="p-4 flex items-center justify-center h-64">
         <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
@@ -174,7 +115,7 @@ export default function EditDeliveryPage() {
     );
   }
 
-  if (loadFailed) {
+  if (loadError) {
     return (
       <div className="p-4">
         <button
@@ -185,7 +126,9 @@ export default function EditDeliveryPage() {
           Back to Delivery
         </button>
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {serverError || "Failed to load delivery"}
+          {loadError instanceof Error
+            ? loadError.message
+            : "Failed to load delivery"}
         </div>
       </div>
     );

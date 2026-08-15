@@ -27,6 +27,7 @@ export interface Delivery {
   id: string;
   deliveryDate: string;
   deliveryCode: string;
+  remark: string | null;
   createdAt: string;
   updatedAt: string;
   lots: DeliveryLot[];
@@ -39,12 +40,12 @@ export interface LotsDto {
   productType: ProductType;
   productName: string;
   supplierName: string;
-  remark?: string;
   stockType: StockType;
 }
 
 export interface CreateDeliveryDto {
   deliveryCode: string;
   deliveryDate: string;
+  remark?: string;
   lots: LotsDto[];
 }

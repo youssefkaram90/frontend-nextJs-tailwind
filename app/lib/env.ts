@@ -8,7 +8,7 @@ function requireEnv(name: string): string {
 }
 
 export const env = {
-  BACKEND_URL: requireEnv("BACKEND_URL"),
+  BACKEND_URL: requireEnv("BACKEND_URL").replace(/\/$/, "") + "/api",
 
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
 };

@@ -1,36 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getStockItems, getStockSummary } from "@/app/lib/services/stock";
-import type { StockItem, StockSummary } from "@/app/lib/types/stock";
+import { useStockItems, useStockSummary } from "@/app/lib/hooks/use-stock";
+import type { StockSummary } from "@/app/lib/types/stock";
+import { Search } from "lucide-react";
+import { useSearch } from "@/app/lib/use-search";
 
 export default function StockPage() {
   const router = useRouter();
-  const [items, setItems] = useState<StockItem[]>([]);
-  const [summary, setSummary] = useState<StockSummary>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { query, setQuery, debouncedQuery } = useSearch();
+  const {
+    data: items = [],
+    isPending,
+    error,
+  } = useStockItems(debouncedQuery || undefined);
+  const { data: summary = {} as StockSummary } = useStockSummary();
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [itemsData, summaryData] = await Promise.all([
-          getStockItems(),
-          getStockSummary(),
-        ]);
-        setItems(itemsData);
-        setSummary(summaryData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load stock");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
-
-  if (loading) {
+  if (isPending) {
     return (
       <div className="p-4">
         <div className="flex items-center justify-center h-64">
@@ -44,7 +30,7 @@ export default function StockPage() {
     return (
       <div className="p-4">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
+          {error.message}
         </div>
       </div>
     );
@@ -87,7 +73,9 @@ export default function StockPage() {
                     {label}
                   </p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {data?.totalQuantity ?? 0}
+                    {key === "PEAT"
+                      ? (data?.totalQuantity ?? 0).toFixed(2)
+                      : (data?.totalQuantity ?? 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-400">
                     {data?.lots ?? 0} lot{data?.lots !== 1 ? "s" : ""}
@@ -97,6 +85,18 @@ export default function StockPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search stock by name, lot, supplier, type…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+        />
       </div>
 
       {/* Stock Items Table */}
@@ -181,7 +181,9 @@ export default function StockPage() {
                       {item.supplierName}
                     </td>
                     <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
-                      {item.currentQuantity}
+                      {item.productType === "PEAT"
+                        ? item.currentQuantity.toFixed(2)
+                        : item.currentQuantity.toLocaleString()}
                     </td>
                   </tr>
                 ))}

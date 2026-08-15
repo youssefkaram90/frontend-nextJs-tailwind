@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return new Response(
-        JSON.stringify({ error: "Backend request time out" }),
+        JSON.stringify({ error: "Backend request timed out" }),
         { status: 504, headers: { "Content-Type": "application/json" } },
       );
     }

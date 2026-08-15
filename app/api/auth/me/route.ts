@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}/me`, {
+    const response = await fetch(`${BACKEND_URL}/users/me`, {
       headers: { Cookie: cookie },
       signal: controller.signal,
     });
@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return new Response(
-        JSON.stringify({ error: "Backend request time out " }),
-        { status: 504, headers: { "Content-Type": "applicaton/json" } },
+        JSON.stringify({ error: "Backend request timed out" }),
+        { status: 504, headers: { "Content-Type": "application/json" } },
       );
     }
     throw error;

@@ -2,63 +2,16 @@
 
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod/v3";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { createDelivery } from "@/app/lib/services/deliveries";
 import { useToast } from "@/app/lib/toast-context";
 import { StockType, ProductType } from "@/app/lib/types/delivery";
 import { ArrowLeft, ChevronDown, Copy, Plus, Trash2 } from "lucide-react";
-
-const lotSchema = z.object({
-  stockType: z.enum(["BIO", "CVT"], {
-    required_error: "Stock type is required",
-  }),
-  lotNumber: z.string().min(1, "Lot number is required"),
-  quantity: z.coerce.number().int().positive("Quantity must be positive"),
-  productType: z.enum(["SEEDS", "PEAT"], {
-    required_error: "Product type is required",
-  }),
-  productName: z.string().min(1, "Product name is required"),
-  supplierName: z.string().min(1, "Supplier name is required"),
-  thousandSeedsPerGram: z
-    .union([z.coerce.number().positive(), z.literal("")])
-    .optional(),
-  remark: z.string().optional(),
-});
-
-const createDeliverySchema = z.object({
-  deliveryDate: z.string().min(1, "Delivery date is required"),
-  deliveryCode: z.string().min(1, "Delivery Code is required"),
-  lots: z
-    .array(lotSchema)
-    .min(1, "At least one lot is required")
-    .superRefine((lots, ctx) => {
-      const seen = new Map<string, number>();
-      lots.forEach((lot, i) => {
-        const num = lot.lotNumber.trim();
-        if (!num) return;
-        const lower = num.toLowerCase();
-        if (seen.has(lower)) {
-          const msg = `Duplicate lot number "${num}"`;
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: msg,
-            path: [i, "lotNumber"],
-          });
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: msg,
-            path: [seen.get(lower)!, "lotNumber"],
-          });
-        } else {
-          seen.set(lower, i);
-        }
-      });
-    }),
-});
-
-type CreateDeliveryFormData = z.infer<typeof createDeliverySchema>;
+import {
+  createDeliverySchema,
+  type CreateDeliveryFormData,
+} from "@/app/schemas/delivery.schema";
 
 export default function CreateDeliveryPage() {
   const router = useRouter();
@@ -78,6 +31,7 @@ export default function CreateDeliveryPage() {
     defaultValues: {
       deliveryDate: new Date().toLocaleDateString("en-CA"),
       deliveryCode: "",
+      remark: "",
       lots: [
         {
           stockType: "CVT",
@@ -87,7 +41,6 @@ export default function CreateDeliveryPage() {
           productName: "",
           supplierName: "",
           thousandSeedsPerGram: "",
-          remark: "",
         },
       ],
     },
@@ -102,15 +55,19 @@ export default function CreateDeliveryPage() {
 
   const [expandedLot, setExpandedLot] = useState<number | null>(0);
 
-  const totalQuantity = useMemo(() => {
-    if (!watchedLots) return 0;
-    return watchedLots.reduce((sum, lot) => {
+  const { seedsTotal, peatTotal } = useMemo(() => {
+    if (!watchedLots) return { seedsTotal: 0, peatTotal: 0 };
+    let seeds = 0;
+    let peat = 0;
+    for (const lot of watchedLots) {
       const qty =
         typeof lot?.quantity === "number" && !isNaN(lot.quantity)
           ? lot.quantity
           : 0;
-      return sum + qty;
-    }, 0);
+      if (lot?.productType === "PEAT") peat += qty;
+      else seeds += qty;
+    }
+    return { seedsTotal: seeds, peatTotal: peat };
   }, [watchedLots]);
 
   // Warn before leaving with unsaved changes
@@ -132,10 +89,11 @@ export default function CreateDeliveryPage() {
       const payload = {
         deliveryDate: data.deliveryDate,
         deliveryCode: data.deliveryCode,
+        ...(data.remark ? { remark: data.remark } : {}),
         lots: data.lots.map((lot) => ({
           stockType: lot.stockType as StockType,
           lotNumber: lot.lotNumber,
-          quantity: lot.quantity,
+          quantity: Number(lot.quantity),
           productType: lot.productType as ProductType,
           productName: lot.productName,
           supplierName: lot.supplierName,
@@ -143,7 +101,6 @@ export default function CreateDeliveryPage() {
           lot.thousandSeedsPerGram > 0
             ? { thousandSeedsPerGram: lot.thousandSeedsPerGram }
             : {}),
-          ...(lot.remark ? { remark: lot.remark } : {}),
         })),
       };
 
@@ -212,7 +169,7 @@ export default function CreateDeliveryPage() {
             Delivery Details
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/*Delivery Code */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -250,6 +207,22 @@ export default function CreateDeliveryPage() {
                 </p>
               )}
             </div>
+
+            {/* Remark */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Remark
+                <span className="text-gray-400 font-normal"> (optional)</span>
+              </label>
+              <input
+                type="text"
+                {...register(`remark`)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
+                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                placeholder="Mark your notes"
+              />
+            </div>
           </div>
         </div>
         {/* Lots */}
@@ -269,7 +242,6 @@ export default function CreateDeliveryPage() {
                   productName: "",
                   supplierName: "",
                   thousandSeedsPerGram: "",
-                  remark: "",
                 })
               }
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"
@@ -333,7 +305,6 @@ export default function CreateDeliveryPage() {
                           supplierName: source?.supplierName ?? "",
                           thousandSeedsPerGram:
                             source?.thousandSeedsPerGram ?? "",
-                          remark: "",
                         });
                       }}
                       className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"
@@ -362,7 +333,7 @@ export default function CreateDeliveryPage() {
                 </div>
 
                 {!isCollapsed && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Product Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -526,25 +497,6 @@ export default function CreateDeliveryPage() {
                         />
                       </div>
                     )}
-
-                    {/* Remark */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Remark
-                        <span className="text-gray-400 font-normal">
-                          {" "}
-                          (optional)
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        {...register(`lots.${index}.remark`)}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                        placeholder="Any notes"
-                      />
-                    </div>
                   </div>
                 )}
               </div>
@@ -556,8 +508,8 @@ export default function CreateDeliveryPage() {
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-500 dark:text-gray-400">
               {fields.length} lot{fields.length !== 1 ? "s" : ""}
-              {totalQuantity > 0 &&
-                ` · ${totalQuantity.toLocaleString()} total qty`}
+              {seedsTotal > 0 && ` · Seeds: ${seedsTotal.toLocaleString()}`}
+              {peatTotal > 0 && ` · Peat: ${peatTotal.toFixed(2)}`}
             </div>
             <button
               type="submit"

@@ -140,7 +140,7 @@ export default function UserDetailPage() {
     setSuccess(null);
     try {
       await updateUserRole(user.id, newRole);
-      setUser({ ...user, role: newRole });
+      setUser({ ...user, role: newRole as typeof user.role });
       setSuccess("Role updated successfully");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update role");
