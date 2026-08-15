@@ -1,2 +1,31 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --animate-slide-in: slide-in 0.3s ease-out;
+
+  /* Design tokens — shared colors */
+  --color-primary: #4f46e5; /* indigo-600 */
+  --color-primary-hover: #4338ca; /* indigo-700 */
+  --color-primary-ring: #6366f1; /* indigo-500 */
+  --color-primary-light: #eef2ff; /* indigo-50 */
+
+  --color-sowing: #16a34a; /* green-600 */
+  --color-sowing-hover: #15803d; /* green-700 */
+  --color-sowing-ring: #22c55e; /* green-500 */
+
+  --color-danger: #dc2626; /* red-600 */
+  --color-danger-hover: #b91c1c; /* red-700 */
+  --color-success: #16a34a; /* green-600 */
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

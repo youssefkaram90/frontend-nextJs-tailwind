@@ -3,14 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 const publicPaths = ["/signin", "/signout"];
 
 export function proxy(request: NextRequest) {
-  const token = request.cookies.get("Authentication")?.value;
+  const accessToken = request.cookies.get("Authentication")?.value;
+  const refreshToken = request.cookies.get("Refresh")?.value;
   const { pathname } = request.nextUrl;
 
   if (publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
 
-  if (!token) {
+  // Only redirect if both tokens are missing — the refresh token is the real session.
+  // A missing access token will be silently refreshed by the API layer on first 401.
+  if (!accessToken && !refreshToken) {
     return NextResponse.redirect(new URL("/signin", request.url));
   }
 

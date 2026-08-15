@@ -1,14 +1,14 @@
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`Missing required envirement variable ${name}`);
+    throw new Error(`Missing required environment variable ${name}`);
   }
 
   return value;
 }
 
 export const env = {
-  BACKEND_URL: requireEnv("BACKEND_URL"),
+  BACKEND_URL: requireEnv("BACKEND_URL").replace(/\/$/, "") + "/api",
 
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
 };

@@ -1,30 +1,49 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  X,
   LayoutDashboardIcon,
   Warehouse,
   Truck,
+  Sprout,
+  Users,
   Moon,
   Sun,
+  ArrowRightLeft,
+  Flower2,
 } from "lucide-react";
 import Link from "next/link";
 
 function Sidebar() {
   const [dark, setDark] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const toggleDarkMode = () => {
-    setDark((current) => {
-      const next = !current;
-      document.documentElement.classList.toggle("dark", next);
-      return next;
-    });
-  };
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    if (stored === "dark") setDark(true);
+    else if (stored === "light") setDark(false);
+    else setDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("theme", dark ? "dark" : "light");
+  }, [dark]);
+
+  const toggleDarkMode = () => setDark((prev) => !prev);
 
   const navItems = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboardIcon },
     { name: "Deliveries", path: "/deliveries", icon: Truck },
+    { name: "Sowing", path: "/sowing", icon: Sprout },
+    {
+      name: "Transport",
+      path: "/sowing/tray-transport",
+      icon: ArrowRightLeft,
+    },
+    { name: "Plant Stock", path: "/plant-stock", icon: Flower2 },
     { name: "Stock", path: "/stock", icon: Warehouse },
+    { name: "Users", path: "/users", icon: Users },
   ];
 
   return (
@@ -62,13 +81,24 @@ function Sidebar() {
           <button
             onClick={toggleDarkMode}
             className="p-2 bg-gray-200 dark:bg-gray-700 rounded-full"
-            aria-label={dark ? "switch to light mode" : "switch to dark mode"}
-            aria-pressed={dark}
+            aria-label={
+              mounted
+                ? dark
+                  ? "switch to light mode"
+                  : "switch to dark mode"
+                : "toggle theme"
+            }
+            aria-pressed={mounted ? dark : undefined}
+            suppressHydrationWarning
           >
-            {dark ? (
-              <Sun className="text-gray-100" />
+            {mounted ? (
+              dark ? (
+                <Sun className="text-gray-100" />
+              ) : (
+                <Moon className="text-gray-900" />
+              )
             ) : (
-              <Moon className="text-gray-900" />
+              <Sun className="text-gray-100" />
             )}
           </button>
         </div>
