@@ -6,6 +6,8 @@ import type {
   SowingPlanEntry,
   ExecuteSSMDto,
   ExecuteLPMDto,
+  UpdateSowingSSMDto,
+  UpdateSowingLPMDto,
   CreateSowingPlanDto,
   CreatePlanEntryDto,
   Tunnel,
@@ -141,6 +143,7 @@ export async function updatePlanStatus(
 export async function importPlanFromExcel(dto: {
   planType: string;
   name: string;
+  location?: string;
   excelBase64: string;
 }): Promise<SowingPlan> {
   return api<SowingPlan>("/api/sowing-plans/import", {
@@ -171,26 +174,35 @@ export async function addPlanEntry(
   });
 }
 
-export async function addBulkPlanEntries(
-  planId: string,
-  dtos: CreatePlanEntryDto[],
-): Promise<void> {
-  await api<void>(`/api/sowing-plans/${planId}/entries/bulk`, {
-    method: "POST",
-    body: JSON.stringify(
-      dtos.map((d) => ({
-        ...d,
-        plannedDate:
-          d.plannedDate instanceof Date
-            ? d.plannedDate.toLocaleDateString("en-CA")
-            : d.plannedDate,
-      })),
-    ),
+export async function deletePlanEntry(entryId: string): Promise<void> {
+  await api<void>(`/api/sowing-plans/entries/${entryId}`, { method: "DELETE" });
+}
+
+/**
+ * Manually close a plan entry even when fewer trays / quantity were executed
+ * than planned. A closed entry leaves the pending list and cannot be sown
+ * against — but it is not a dead end any more: `reopenPlanEntry` puts it back
+ * (SPLAN-12).
+ */
+export async function closePlanEntry(
+  entryId: string,
+): Promise<SowingPlanEntry> {
+  return api<SowingPlanEntry>(`/api/sowing-plans/entries/${entryId}/close`, {
+    method: "PATCH",
   });
 }
 
-export async function deletePlanEntry(entryId: string): Promise<void> {
-  await api<void>(`/api/sowing-plans/entries/${entryId}`, { method: "DELETE" });
+/**
+ * Undo a manual close (SPLAN-12). The entry goes back to whatever its sowings
+ * say it is — EXECUTED, PARTIALLY_EXECUTED or PLANNED — and reappears in the
+ * pending list if it still has work left.
+ */
+export async function reopenPlanEntry(
+  entryId: string,
+): Promise<SowingPlanEntry> {
+  return api<SowingPlanEntry>(`/api/sowing-plans/entries/${entryId}/reopen`, {
+    method: "PATCH",
+  });
 }
 
 // --- Pending entries (executor dashboard) ---
@@ -227,7 +239,7 @@ export async function executeSSM(dto: ExecuteSSMDto): Promise<SowingSSM> {
 
 export async function updateSowingSSM(
   id: string,
-  dto: ExecuteSSMDto,
+  dto: UpdateSowingSSMDto,
 ): Promise<SowingSSM> {
   return api<SowingSSM>(`/api/sowing-ssm/${id}`, {
     method: "PATCH",
@@ -273,7 +285,7 @@ export async function executeLPM(dto: ExecuteLPMDto): Promise<SowingLPM> {
 
 export async function updateSowingLPM(
   id: string,
-  dto: ExecuteLPMDto,
+  dto: UpdateSowingLPMDto,
 ): Promise<SowingLPM> {
   return api<SowingLPM>(`/api/sowing-lpm/${id}`, {
     method: "PATCH",

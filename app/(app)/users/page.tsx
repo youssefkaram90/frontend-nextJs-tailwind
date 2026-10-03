@@ -5,10 +5,13 @@ import { useUsers } from "@/app/lib/hooks/use-users";
 import { Users, Plus, Shield, ShieldOff, Search } from "lucide-react";
 import { TableSkeleton } from "@/app/components/skeleton";
 import { useSearch } from "@/app/lib/use-search";
+import { usePermissions } from "@/app/lib/hooks/use-permissions";
 
 export default function UsersPage() {
   const router = useRouter();
   const { query, setQuery, debouncedQuery } = useSearch();
+  // Creating users is ADMIN-only on the server (AdminOnlyGuard).
+  const { isAdmin } = usePermissions();
   const {
     data: users = [],
     isPending,
@@ -51,14 +54,16 @@ export default function UsersPage() {
             Manage user accounts
           </p>
         </div>
-        <button
-          onClick={() => router.push("/signup")}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg
-            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-200 text-sm"
-        >
-          <Plus className="h-4 w-4" />
-          New User
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => router.push("/signup")}
+            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl
+            focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 text-sm"
+          >
+            <Plus className="h-4 w-4" />
+            New User
+          </button>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -69,7 +74,7 @@ export default function UsersPage() {
           placeholder="Search users by name, last name, role…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition text-sm"
         />
       </div>
 

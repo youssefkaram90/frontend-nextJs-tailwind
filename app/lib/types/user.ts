@@ -17,7 +17,8 @@ export interface User {
   lastName: string | null;
   createdAt: string;
   updatedAt: string;
-  permissions?: Permission[];
+  /** Flat list of permission names, e.g. "deliveries.create" (GET /users/me) */
+  permissions?: string[];
 }
 
 export interface SigninDto {

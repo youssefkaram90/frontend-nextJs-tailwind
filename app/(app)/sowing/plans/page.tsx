@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useSearch } from "@/app/lib/use-search";
+import { useCaps } from "@/app/lib/hooks/use-permissions";
 
 export default function PlansPage() {
   const router = useRouter();
@@ -40,6 +41,8 @@ export default function PlansPage() {
     }
     return { activePlans: active, completedPlans: completed };
   }, [plans]);
+
+  const caps = useCaps("sowing");
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete plan "${name}"? This cannot be undone.`)) return;
@@ -81,7 +84,7 @@ export default function PlansPage() {
     return (
       <div
         key={plan.id}
-        className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-200"
+        className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-200"
       >
         <div
           className="p-5 cursor-pointer"
@@ -140,17 +143,19 @@ export default function PlansPage() {
           </p>
         </div>
         <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-2 flex justify-end">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(plan.id, plan.name);
-            }}
-            disabled={deleting === plan.id}
-            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 disabled:opacity-50 py-1 px-2 rounded transition"
-          >
-            <Trash2 className="h-3 w-3" />
-            {deleting === plan.id ? "Deleting…" : "Delete"}
-          </button>
+          {caps.delete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(plan.id, plan.name);
+              }}
+              disabled={deleting === plan.id}
+              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 disabled:opacity-50 py-1 px-2 rounded transition"
+            >
+              <Trash2 className="h-3 w-3" />
+              {deleting === plan.id ? "Deleting…" : "Delete"}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -187,20 +192,24 @@ export default function PlansPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push("/sowing/plans/create?tab=import")}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 text-sm"
-          >
-            <Upload className="h-4 w-4" />
-            Import
-          </button>
-          <button
-            onClick={() => router.push("/sowing/plans/create")}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 text-sm"
-          >
-            <Plus className="h-4 w-4" />
-            New Plan
-          </button>
+          {caps.create && (
+            <>
+              <button
+                onClick={() => router.push("/sowing/plans/create?tab=import")}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 text-sm"
+              >
+                <Upload className="h-4 w-4" />
+                Import
+              </button>
+              <button
+                onClick={() => router.push("/sowing/plans/create")}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                New Plan
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -223,13 +232,15 @@ export default function PlansPage() {
           <p className="mt-4 text-gray-500 dark:text-gray-400">
             No plans found.
           </p>
-          <button
-            onClick={() => router.push("/sowing/plans/create")}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition text-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Create your first plan
-          </button>
+          {caps.create && (
+            <button
+              onClick={() => router.push("/sowing/plans/create")}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Create your first plan
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-8">

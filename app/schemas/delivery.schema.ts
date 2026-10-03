@@ -22,7 +22,7 @@ export const lotSchema = z.object({
 export const createDeliverySchema = z.object({
   deliveryDate: z.string().min(1, "Delivery date is required"),
   deliveryCode: z.string().min(1, "Delivery Code is required"),
-  remark: z.string().optional(),
+  transport: z.string().min(1, "Means of Transport is required"),
   lots: z
     .array(lotSchema)
     .min(1, "At least one lot is required")
@@ -35,12 +35,12 @@ export const createDeliverySchema = z.object({
         if (seen.has(lower)) {
           const msg = `Duplicate lot number "${num}"`;
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             message: msg,
             path: [i, "lotNumber"],
           });
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             message: msg,
             path: [seen.get(lower)!, "lotNumber"],
           });
@@ -54,6 +54,7 @@ export const createDeliverySchema = z.object({
 export const editDeliverySchema = z.object({
   deliveryCode: z.string().min(1, "Delivery code is required"),
   deliveryDate: z.string().min(1, "Delivery date is required"),
+  transport: z.string().min(1, "Means of Transport is required"),
   lots: z
     .array(lotSchema)
     .min(1, "At least one lot is required")
@@ -66,12 +67,12 @@ export const editDeliverySchema = z.object({
         if (seen.has(lower)) {
           const msg = `Duplicate lot number "${num}"`;
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             message: msg,
             path: [i, "lotNumber"],
           });
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             message: msg,
             path: [seen.get(lower)!, "lotNumber"],
           });

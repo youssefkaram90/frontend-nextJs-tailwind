@@ -31,6 +31,7 @@ import {
   type SowingCreateFormInput,
   DEFAULT_SEEDS_PER_TRAY,
 } from "@/app/schemas/sowing.schema";
+import { ROWS_PER_LINE, seedsPerRowMetre } from "@/app/lib/sowing-constants";
 
 const TRAYS_PER_BIG_BALL = 380;
 
@@ -91,20 +92,21 @@ export default function CreateSowingPage() {
       planId: urlPlanId,
       sowingType: "SSM",
       sowingDate: new Date().toISOString().split("T")[0],
-      remarks: "",
       records: [
         {
           variety: "",
+          code: "",
           lotNumber: "",
           stockType: "",
           tunnelId: "",
           sectorId: "",
-          numberOfTrays: 0,
+          numberOfTrays: "",
           seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
-          quantityUsed: 0,
-          lines: "",
+          quantityUsed: "",
+          lines: undefined,
           metersPerLine: undefined,
           seedsPerMeter: undefined,
+          remarks: "",
         },
       ],
     },
@@ -118,6 +120,10 @@ export default function CreateSowingPage() {
 
   const stockMap = useMemo(() => groupStockByVariety(stockItems), [stockItems]);
   const varieties = useMemo(() => Object.keys(stockMap).sort(), [stockMap]);
+
+  // Total seeds on hand for a variety (sum of all its lots)
+  const varietyAvailable = (variety: string) =>
+    (stockMap[variety] ?? []).reduce((sum, l) => sum + l.quantity, 0);
 
   const recordsValues = useWatch({ control, name: "records" });
 
@@ -138,8 +144,14 @@ export default function CreateSowingPage() {
 
     getSowingPlan(urlPlanId)
       .then((plan) => {
-        const entries = (plan.entries ?? []).filter((e: any) =>
-          ids.includes(e.id),
+        // An entry that is already executed, or that was closed on purpose, is
+        // not sowable any more — the server refuses it (SPLAN-02) — so a stale
+        // link must not pre-fill a record the save would reject.
+        const entries = (plan.entries ?? []).filter(
+          (e: any) =>
+            ids.includes(e.id) &&
+            e.status !== "EXECUTED" &&
+            e.status !== "CLOSED",
         );
         if (entries.length === 0) return;
 
@@ -171,9 +183,9 @@ export default function CreateSowingPage() {
           numberOfTrays: entry.plannedTrays ?? 0,
           seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
           quantityUsed: entry.plannedQuantity ?? 0,
-          lines: entry.lines ?? "",
+          lines: entry.lines ?? 0,
+          code: entry.code,
           metersPerLine: entry.metersPerLine ?? undefined,
-          seedsPerMeter: entry.seedsPerMeter ?? undefined,
         }));
         replace(records);
       })
@@ -188,14 +200,15 @@ export default function CreateSowingPage() {
         const base = {
           planId: data.planId,
           planEntryId: r.planEntryId || urlPlanEntryId || undefined,
-          variety: r.variety,
           lotNumber: r.lotNumber,
           sowingDate: new Date(data.sowingDate),
-          remarks: data.remarks,
+          remarks: r.remarks,
         };
         if (data.sowingType === "SSM") {
           await executeSSM({
             ...base,
+            variety: r.variety,
+            code: r.code != null ? Number(r.code) : undefined,
             tunnelId: r.tunnelId || undefined,
             stockType: r.stockType,
             numberOfTrays: Number(r.numberOfTrays ?? 0),
@@ -204,14 +217,15 @@ export default function CreateSowingPage() {
         } else {
           await executeLPM({
             ...base,
+            variety: r.variety,
             sectorId: r.sectorId || undefined,
             stockType: r.stockType,
             quantityUsed: Number(r.quantityUsed ?? 0),
-            lines: r.lines || undefined,
-            metersPerLine:
+            lines: Number(r.lines) || undefined,
+            meterPerLine:
               r.metersPerLine != null ? Number(r.metersPerLine) : undefined,
-            seedsPerMeter:
-              r.seedsPerMeter != null ? Number(r.seedsPerMeter) : undefined,
+            // seedsPerMeter is derived by the backend from the seed quantity,
+            // the number of lines and the line length — never sent from here.
           });
         }
       }
@@ -253,7 +267,7 @@ export default function CreateSowingPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
+            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
           >
             {submitting
               ? "Creating..."
@@ -273,13 +287,28 @@ export default function CreateSowingPage() {
             Global Settings
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/**Sowing Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Plan *
+                Sowing Type <span className="text-red-400 font-normal"> *</span>
+              </label>
+              <select
+                {...register("sowingType")}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="SSM">SSM — Tunnel (Tray)</option>
+                <option value="LPM">LPM — Field (Direct)</option>
+              </select>
+            </div>
+
+            {/**Plan */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Plan <span className="text-red-400 font-normal"> *</span>
               </label>
               <select
                 {...register("planId")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="">Select a plan...</option>
                 {activePlans.map((p) => (
@@ -294,43 +323,22 @@ export default function CreateSowingPage() {
                 </p>
               )}
             </div>
+
+            {/**Sowing Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Sowing Type *
-              </label>
-              <select
-                {...register("sowingType")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-              >
-                <option value="SSM">SSM — Tunnel (Tray)</option>
-                <option value="LPM">LPM — Field (Direct)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Sowing Date *
+                Sowing Date <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="date"
                 {...register("sowingDate")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               {errors.sowingDate && (
                 <p className="mt-1 text-xs text-red-600">
                   {errors.sowingDate.message}
                 </p>
               )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Remarks
-              </label>
-              <input
-                type="text"
-                {...register("remarks")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                placeholder="Optional notes..."
-              />
             </div>
           </div>
         </div>
@@ -346,16 +354,18 @@ export default function CreateSowingPage() {
               onClick={() => {
                 append({
                   variety: "",
+                  code: "",
                   lotNumber: "",
                   stockType: "",
                   tunnelId: "",
                   sectorId: "",
                   numberOfTrays: "",
                   seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
-                  quantityUsed: 0,
-                  lines: "",
+                  quantityUsed: "",
+                  lines: undefined,
                   metersPerLine: undefined,
                   seedsPerMeter: undefined,
+                  remarks: "",
                 });
                 setOpenEntry(fields.length);
               }}
@@ -368,11 +378,29 @@ export default function CreateSowingPage() {
           {fields.map((field, index) => {
             const isOpen = openEntry === index;
             const varietyVal = recordsValues?.[index]?.variety ?? "";
+            const varietyCode = recordsValues?.[index]?.code;
+            const varietyLabel =
+              sowingType === "SSM" && varietyCode
+                ? `${varietyVal} ${String(varietyCode).trim()}`
+                : varietyVal;
             const lots = getLotsForVariety(varietyVal);
             const nTrays = Number(recordsValues?.[index]?.numberOfTrays ?? 0);
             const sPerTray = Number(
               recordsValues?.[index]?.seedsPerTray ?? DEFAULT_SEEDS_PER_TRAY,
             );
+            const isFromPlan = !!recordsValues?.[index]?.planEntryId;
+
+            // ---- stock availability (see part C) ----
+            const neededQty =
+              sowingType === "SSM"
+                ? nTrays * sPerTray
+                : Number(recordsValues?.[index]?.quantityUsed ?? 0);
+            const availableQty = varietyVal ? varietyAvailable(varietyVal) : 0;
+            const varietyOutOfStock = !!varietyVal && availableQty <= 0;
+            const varietyInsufficient =
+              !!varietyVal && availableQty > 0 && neededQty > availableQty;
+            const varietyHasStockIssue =
+              varietyOutOfStock || varietyInsufficient;
             const lot = recordsValues?.[index]?.lotNumber;
             const seeds = recordsValues?.[index]?.quantityUsed as string;
             const total =
@@ -403,7 +431,7 @@ export default function CreateSowingPage() {
                     Record #{index + 1}
                     {varietyVal && (
                       <span className="text-gray-900 dark:text-white font-semibold">
-                        - {varietyVal} lot : {lot} Quantity :{" "}
+                        - {varietyLabel} lot : {lot} Quantity :{" "}
                         {sowingType === "SSM" ? total : seeds}
                       </span>
                     )}
@@ -429,26 +457,67 @@ export default function CreateSowingPage() {
                 {isOpen && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* Variety */}
+                    {/* Variety */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Variety *
+                        Variety{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
-                      <select
-                        {...register(`records.${index}.variety`, {
-                          onChange: () => {
-                            setValue(`records.${index}.lotNumber`, "");
-                            setValue(`records.${index}.stockType`, "");
-                          },
-                        })}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                      >
-                        <option value="">Select variety...</option>
-                        {varieties.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
+
+                      {isFromPlan ? (
+                        <>
+                          {/* value still submitted, just not editable */}
+                          <input
+                            type="hidden"
+                            {...register(`records.${index}.variety`)}
+                          />
+                          <div
+                            className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                              varietyHasStockIssue
+                                ? "border-red-300 bg-red-50 text-red-800 dark:border-red-700 dark:bg-red-900/30 dark:text-red-200"
+                                : "border-gray-200 bg-gray-100 text-gray-700 dark:border-gray-700 dark:bg-gray-700/40 dark:text-gray-200"
+                            }`}
+                          >
+                            {varietyVal || "—"}
+                            <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
+                              from plan
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <select
+                          {...register(`records.${index}.variety`, {
+                            onChange: () => {
+                              setValue(`records.${index}.lotNumber`, "");
+                              setValue(`records.${index}.stockType`, "");
+                            },
+                          })}
+                          className={`w-full rounded-xl border px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                            varietyHasStockIssue
+                              ? "border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/30"
+                              : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+                          }`}
+                        >
+                          <option value="">Select variety...</option>
+                          {varieties.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {varietyOutOfStock && (
+                        <p className="mt-1 text-xs text-red-600">
+                          No stock available for {varietyVal}
+                        </p>
+                      )}
+                      {!varietyOutOfStock && varietyInsufficient && (
+                        <p className="mt-1 text-xs text-red-600">
+                          Not enough stock — need {neededQty.toLocaleString()},
+                          available {availableQty.toLocaleString()}
+                        </p>
+                      )}
                       {recordErrors?.variety && (
                         <p className="mt-1 text-xs text-red-600">
                           {recordErrors.variety.message}
@@ -456,10 +525,33 @@ export default function CreateSowingPage() {
                       )}
                     </div>
 
+                    {/* Code — SSM only */}
+                    {sowingType === "SSM" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Code{" "}
+                          <span className="text-red-400 font-normal"> *</span>
+                        </label>
+                        <input
+                          type="number"
+                          {...register(`records.${index}.code`)}
+                          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          placeholder="e.g. 1"
+                          min={1}
+                        />
+                        {recordErrors?.code && (
+                          <p className="mt-1 text-xs text-red-600">
+                            {recordErrors.code.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Lot Number */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Lot Number *
+                        Lot Number{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
                       <select
                         {...register(`records.${index}.lotNumber`, {
@@ -475,7 +567,7 @@ export default function CreateSowingPage() {
                               );
                           },
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                         disabled={!varietyVal}
                       >
                         <option value="">
@@ -506,13 +598,17 @@ export default function CreateSowingPage() {
                     {/* SSM */}
                     {sowingType === "SSM" && (
                       <>
+                        {/* tunnel */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Tunnel
+                            Tunnel{" "}
+                            <span className="text-gray-400 font-normal">
+                              (Optionnal)
+                            </span>
                           </label>
                           <select
                             {...register(`records.${index}.tunnelId`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                           >
                             <option value="">Not assigned yet...</option>
                             {tunnels.map((t) => (
@@ -527,14 +623,16 @@ export default function CreateSowingPage() {
                             </p>
                           )}
                         </div>
+                        {/* number of trays */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Number of Trays *
+                            Number of Trays{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <input
                             type="number"
                             {...register(`records.${index}.numberOfTrays`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                             placeholder="e.g. 100"
                             min={1}
                           />
@@ -551,18 +649,21 @@ export default function CreateSowingPage() {
                             </p>
                           )}
                         </div>
+                        {/* seeds per tray */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Seeds per Tray
+                            Seeds per Tray{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <input
                             type="number"
                             {...register(`records.${index}.seedsPerTray`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                             placeholder={`${DEFAULT_SEEDS_PER_TRAY}`}
                             min={1}
                           />
                         </div>
+                        {/* total SSM seeds */}
                         {total && (
                           <div className="sm:col-span-2 lg:col-span-3">
                             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 flex items-center gap-3">
@@ -599,13 +700,16 @@ export default function CreateSowingPage() {
                             </p>
                           </div>
                         )}
+
+                        {/* Sector */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Sector *
+                            Sector{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <select
                             {...register(`records.${index}.sectorId`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                           >
                             <option value="">Select sector...</option>
                             {sectors.map((s) => (
@@ -621,14 +725,19 @@ export default function CreateSowingPage() {
                             </p>
                           )}
                         </div>
+
+                        {/* Lines */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Lines *
+                            Lines{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <input
-                            type="text"
-                            {...register(`records.${index}.lines`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            type="number"
+                            {...register(`records.${index}.lines`, {
+                              valueAsNumber: true,
+                            })}
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                             placeholder="e.g. 2 or 2.5"
                           />
                           {recordErrors?.lines && (
@@ -637,14 +746,17 @@ export default function CreateSowingPage() {
                             </p>
                           )}
                         </div>
+
+                        {/* Lines lenght  */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Line Meters *
+                            Line Meters{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <input
                             type="number"
                             {...register(`records.${index}.metersPerLine`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                             placeholder="e.g. 120"
                           />
                           {recordErrors?.metersPerLine && (
@@ -653,15 +765,18 @@ export default function CreateSowingPage() {
                             </p>
                           )}
                         </div>
+
+                        {/*Seeds quantity */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Quantity of Seeds *
+                            Quantity of Seeds{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <input
                             type="number"
                             {...register(`records.${index}.quantityUsed`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                            placeholder="e.g. 5000"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            placeholder="e.g. 5 000"
                             min={1}
                           />
                           {recordErrors?.quantityUsed && (
@@ -670,40 +785,18 @@ export default function CreateSowingPage() {
                             </p>
                           )}
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Seeds/Meter
-                          </label>
-                          <input
-                            type="number"
-                            {...register(`records.${index}.seedsPerMeter`)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                            placeholder="e.g. 150"
-                            min={1}
-                          />
-                          <p className="mt-1 text-xs text-gray-400">
-                            Actual seeds per meter — adjust if it differs from
-                            the plan.
-                          </p>
-                        </div>
                         {/* Computed Seeds/Meter helper */}
                         {(() => {
                           const qty = Number(
                             recordsValues?.[index]?.quantityUsed ?? 0,
                           );
-                          const linesNum = parseFloat(
-                            (recordsValues?.[index]?.lines || "0").replace(
-                              ",",
-                              ".",
-                            ),
+                          const linesNum = Number(
+                            recordsValues?.[index]?.lines ?? 0,
                           );
                           const mpl = Number(
                             recordsValues?.[index]?.metersPerLine ?? 0,
                           );
-                          const spm =
-                            linesNum > 0 && mpl > 0 && qty > 0
-                              ? Math.round(qty / (linesNum * mpl * 7))
-                              : 0;
+                          const spm = seedsPerRowMetre(qty, linesNum, mpl);
                           return spm > 0 ? (
                             <div className="sm:col-span-2 lg:col-span-3">
                               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 flex items-center gap-3">
@@ -714,26 +807,30 @@ export default function CreateSowingPage() {
                                     {spm.toLocaleString("fr-FR")}
                                   </span>{" "}
                                   seeds/m ({qty.toLocaleString("fr-FR")} / (
-                                  {linesNum} × {mpl} × 7))
+                                  {linesNum} × {mpl} × {ROWS_PER_LINE}))
                                 </p>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setValue(
-                                      `records.${index}.seedsPerMeter`,
-                                      spm,
-                                    )
-                                  }
-                                  className="text-xs font-medium text-green-700 dark:text-green-300 hover:underline"
-                                >
-                                  Use
-                                </button>
                               </div>
                             </div>
                           ) : null;
                         })()}
                       </>
                     )}
+
+                    {/* Remarks — per record */}
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Remarks{" "}
+                        <span className="text-gray-400 font-normal">
+                          (Optionnal)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        {...register(`records.${index}.remarks`)}
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Optional notes..."
+                      />
+                    </div>
                   </div>
                 )}
               </div>

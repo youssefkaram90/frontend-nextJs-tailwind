@@ -4,11 +4,11 @@
 @theme {
   --animate-slide-in: slide-in 0.3s ease-out;
 
-  /* Design tokens — shared colors */
-  --color-primary: #4f46e5; /* indigo-600 */
-  --color-primary-hover: #4338ca; /* indigo-700 */
-  --color-primary-ring: #6366f1; /* indigo-500 */
-  --color-primary-light: #eef2ff; /* indigo-50 */
+  /* Design tokens — shared colors (Gen B: green primary) */
+  --color-primary: #16a34a; /* green-600 */
+  --color-primary-hover: #15803d; /* green-700 */
+  --color-primary-ring: #22c55e; /* green-500 */
+  --color-primary-light: #f0fdf4; /* green-50 */
 
   --color-sowing: #16a34a; /* green-600 */
   --color-sowing-hover: #15803d; /* green-700 */

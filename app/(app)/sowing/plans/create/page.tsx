@@ -15,6 +15,7 @@ import {
   type PlanCreateFormInput,
   type PlanEntryFormInput,
 } from "@/app/schemas/sowing-plan.schema";
+import { seedsPerRowMetre } from "@/app/lib/sowing-constants";
 import { Banner } from "@/app/components/ui/banner";
 import {
   ArrowLeft,
@@ -62,9 +63,9 @@ export default function CreatePlanPage() {
           peat: "",
           plannedTrays: undefined,
           plannedQuantity: undefined,
-          lines: "",
+          lines: undefined,
           metersPerLine: undefined,
-          seedsPerMeter: undefined,
+          remark: "",
         },
       ],
     },
@@ -119,20 +120,17 @@ export default function CreatePlanPage() {
       if (tab === "manual") {
         const cleanEntries = data.entries.map((e) => {
           // Auto-calculate plannedQuantity:
-          // SSM: Trays × 285  |  LPM: Lines × MetersPerLine × SeedsPerMeter × 7
+          // SSM: Trays × 285 seeds. LPM: the planner enters the seeds directly.
           let plannedQuantity: number | undefined;
 
           if (isSSM) {
             const trays = e.plannedTrays != null ? Number(e.plannedTrays) : 0;
             plannedQuantity = trays > 0 ? Math.round(trays * 285) : undefined;
           } else {
-            const linesNum = parseFloat((e.lines || "0").replace(",", "."));
-            const mpl = e.metersPerLine != null ? Number(e.metersPerLine) : 0;
-            const spm = e.seedsPerMeter != null ? Number(e.seedsPerMeter) : 0;
+            // LPM: the planner enters the seed quantity. Seeds/metre is derived
+            // from it server-side and shown back as a preview.
             plannedQuantity =
-              linesNum > 0 && mpl > 0 && spm > 0
-                ? Math.round(linesNum * mpl * spm * 7)
-                : undefined;
+              e.plannedQuantity != null ? Number(e.plannedQuantity) : undefined;
           }
 
           return {
@@ -143,11 +141,10 @@ export default function CreatePlanPage() {
             plannedTrays:
               e.plannedTrays != null ? Number(e.plannedTrays) : undefined,
             plannedQuantity,
-            lines: e.lines,
+            lines: e.lines != null ? Number(e.lines) : undefined,
             metersPerLine:
               e.metersPerLine != null ? Number(e.metersPerLine) : undefined,
-            seedsPerMeter:
-              e.seedsPerMeter != null ? Number(e.seedsPerMeter) : undefined,
+            remark: e.remark,
           };
         });
 
@@ -181,6 +178,7 @@ export default function CreatePlanPage() {
         const plan = await importPlanFromExcel({
           planType: data.planType as SowingType,
           name: data.planName,
+          location: data.location,
           excelBase64: base64,
         });
 
@@ -232,17 +230,32 @@ export default function CreatePlanPage() {
 
       <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         {/* Plan Info Card */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg p-6 space-y-4">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/** Planne Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Plan Name *
+                Plan Type <span className="text-red-400 font-normal"> *</span>
+              </label>
+              <select
+                {...register("planType")}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="SSM">SSM (Tunnel)</option>
+                <option value="LPM">LPM (Field)</option>
+              </select>
+            </div>
+
+            {/** Planned Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Plan Name <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="text"
-                placeholder="e.g. Sector 10"
+                placeholder={isSSM ? "e.g. Week 1" : "e.g. Sector 1"}
                 {...register("planName")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               {errors.planName && (
                 <p className="mt-1 text-xs text-red-600">
@@ -250,51 +263,41 @@ export default function CreatePlanPage() {
                 </p>
               )}
             </div>
+
+            {/** Planne Location */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Plan Type
+                Location{" "}
+                {isSSM ? (
+                  <span className="text-gray-400 font-normal"> (Optional)</span>
+                ) : (
+                  <span className="text-red-400 font-normal"> *</span>
+                )}
               </label>
-              <select
-                {...register("planType")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-              >
-                <option value="SSM">SSM (Tunnel)</option>
-                <option value="LPM">LPM (Field)</option>
-              </select>
+              <input
+                type="text"
+                placeholder={isSSM ? "e.g. Tunnel 1" : "e.g. Said 1"}
+                {...register("location")}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              {errors.location && (
+                <p className="mt-1 text-xs text-red-600">
+                  {errors.location.message}
+                </p>
+              )}
             </div>
 
-            {!isSSM && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Said 1"
-                  {...register("location")}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-                />
-                {errors.location && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.location.message}
-                  </p>
-                )}
-                {sectorCode && (
-                  <p className="mt-1 text-xs text-green-600 dark:text-green-400 font-medium">
-                    Sector: {sectorCode}
-                  </p>
-                )}
-              </div>
-            )}
+            {/** Planned Date */}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Planned Date *
+                Planned Date{" "}
+                <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="date"
                 {...register("plannedDate")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               {errors.plannedDate && (
                 <p className="mt-1 text-xs text-red-600">
@@ -349,9 +352,9 @@ export default function CreatePlanPage() {
                     peat: "",
                     plannedTrays: undefined,
                     plannedQuantity: undefined,
-                    lines: "",
+                    lines: undefined,
                     metersPerLine: undefined,
-                    seedsPerMeter: undefined,
+                    remark: "",
                   });
                   setOpenEntry(fields.length);
                 }}
@@ -422,14 +425,16 @@ export default function CreatePlanPage() {
                   {isOpen && (
                     <>
                       <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+                        {/** Variety */}
                         <div>
                           <label className="block text-xs text-gray-500 mb-0.5">
-                            Variety *
+                            Variety{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <input
                             type="text"
                             {...register(`entries.${idx}.variety`)}
-                            className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                             placeholder="Variety name"
                           />
                           {errors.entries?.[idx]?.variety && (
@@ -438,13 +443,16 @@ export default function CreatePlanPage() {
                             </p>
                           )}
                         </div>
+
+                        {/** CStock Type */}
                         <div>
                           <label className="block text-xs text-gray-500 mb-0.5">
-                            Stock Type
+                            Stock Type{" "}
+                            <span className="text-red-400 font-normal"> *</span>
                           </label>
                           <select
                             {...register(`entries.${idx}.stockType`)}
-                            className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                           >
                             <option value="BIO">BIO</option>
                             <option value="CVT">CVT</option>
@@ -456,16 +464,21 @@ export default function CreatePlanPage() {
                       {isSSM && (
                         <>
                           <div className="grid grid-cols-2 gap-3">
+                            {/**Planned trayes */}
                             <div>
                               <label className="block text-xs text-gray-500 mb-0.5">
-                                Planned Trays *
+                                Planned Trays{" "}
+                                <span className="text-red-400 font-normal">
+                                  {" "}
+                                  *
+                                </span>
                               </label>
                               <input
                                 type="number"
                                 min="1"
                                 {...register(`entries.${idx}.plannedTrays`)}
-                                className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-green-500"
-                                placeholder="e.g. 360"
+                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="e.g. 1 000"
                               />
                               {errors.entries?.[idx]?.plannedTrays && (
                                 <p className="mt-1 text-xs text-red-600">
@@ -473,14 +486,20 @@ export default function CreatePlanPage() {
                                 </p>
                               )}
                             </div>
+
+                            {/**peat used */}
                             <div>
                               <label className="block text-xs text-gray-500 mb-0.5">
-                                Peat
+                                Peat{" "}
+                                <span className="text-red-400 font-normal">
+                                  {" "}
+                                  *
+                                </span>
                               </label>
                               <input
                                 type="text"
                                 {...register(`entries.${idx}.peat`)}
-                                className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                                 placeholder='e.g. "50% CVT 50% BIO"'
                               />
                             </div>
@@ -496,7 +515,7 @@ export default function CreatePlanPage() {
                             return (
                               <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-2">
                                 <span className="text-xs text-green-600 dark:text-green-400">
-                                  Seeds Total
+                                  Seeds Total {`Trays(${trays}) * 285`}
                                 </span>
                                 <p className="text-sm font-bold text-green-700 dark:text-green-300">
                                   {total > 0
@@ -513,14 +532,19 @@ export default function CreatePlanPage() {
                       {!isSSM && (
                         <>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {/** Lines Count */}
                             <div>
                               <label className="block text-xs text-gray-500 mb-0.5">
-                                Lines *
+                                Lines{" "}
+                                <span className="text-red-400 font-normal">
+                                  {" "}
+                                  *
+                                </span>
                               </label>
                               <input
                                 type="text"
                                 {...register(`entries.${idx}.lines`)}
-                                className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                                 placeholder="e.g. 2 or 2.5"
                               />
                               {errors.entries?.[idx]?.lines && (
@@ -529,14 +553,20 @@ export default function CreatePlanPage() {
                                 </p>
                               )}
                             </div>
+
+                            {/**Lines lenght */}
                             <div>
                               <label className="block text-xs text-gray-500 mb-0.5">
-                                Meters/Line *
+                                Meters/Line{" "}
+                                <span className="text-red-400 font-normal">
+                                  {" "}
+                                  *
+                                </span>
                               </label>
                               <input
                                 type="number"
                                 {...register(`entries.${idx}.metersPerLine`)}
-                                className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                                 placeholder="e.g. 120"
                               />
                               {errors.entries?.[idx]?.metersPerLine && (
@@ -545,53 +575,53 @@ export default function CreatePlanPage() {
                                 </p>
                               )}
                             </div>
+
+                            {/**Seeds to sow */}
                             <div>
                               <label className="block text-xs text-gray-500 mb-0.5">
-                                Seeds/Meter *
+                                Seeds{" "}
+                                <span className="text-red-400 font-normal">
+                                  {" "}
+                                  *
+                                </span>
                               </label>
                               <input
                                 type="number"
-                                {...register(`entries.${idx}.seedsPerMeter`)}
-                                className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-green-500"
-                                placeholder="e.g. 120"
+                                {...register(`entries.${idx}.plannedQuantity`)}
+                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="e.g. 50000"
                               />
-                              {errors.entries?.[idx]?.seedsPerMeter && (
+                              {errors.entries?.[idx]?.plannedQuantity && (
                                 <p className="mt-1 text-xs text-red-600">
-                                  {errors.entries[idx]?.seedsPerMeter?.message}
+                                  {
+                                    errors.entries[idx]?.plannedQuantity
+                                      ?.message
+                                  }
                                 </p>
                               )}
                             </div>
                           </div>
 
-                          {/* Computed Seeds Total (LPM: Lines × M/L × S/M × 7) */}
+                          {/* Derived Seeds/Meter: seeds ÷ (lines × M/L × rows per line) */}
                           {(() => {
-                            const linesNum = parseFloat(
-                              (watchedEntries?.[idx]?.lines || "0").replace(
-                                ",",
-                                ".",
-                              ),
-                            );
+                            const linesNum =
+                              Number(watchedEntries?.[idx]?.lines) || 0;
                             const mpl =
                               watchedEntries?.[idx]?.metersPerLine != null
                                 ? Number(watchedEntries[idx].metersPerLine)
                                 : 0;
-                            const spm =
-                              watchedEntries?.[idx]?.seedsPerMeter != null
-                                ? Number(watchedEntries[idx].seedsPerMeter)
+                            const seeds =
+                              watchedEntries?.[idx]?.plannedQuantity != null
+                                ? Number(watchedEntries[idx].plannedQuantity)
                                 : 0;
-                            const total =
-                              linesNum > 0 && mpl > 0 && spm > 0
-                                ? Math.round(linesNum * mpl * spm * 7)
-                                : 0;
+                            const spm = seedsPerRowMetre(seeds, linesNum, mpl);
                             return (
                               <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-2">
                                 <span className="text-xs text-green-600 dark:text-green-400">
-                                  Seeds Total (×7)
+                                  Seeds/Meter (auto)
                                 </span>
                                 <p className="text-sm font-bold text-green-700 dark:text-green-300">
-                                  {total > 0
-                                    ? total.toLocaleString("fr-FR")
-                                    : "0"}
+                                  {spm > 0 ? spm.toLocaleString("fr-FR") : "0"}
                                 </p>
                               </div>
                             );
@@ -600,6 +630,29 @@ export default function CreatePlanPage() {
                       )}
                     </>
                   )}
+                  {/**Remark for each Row */}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">
+                        Remark{" "}
+                        <span className="text-gray-400 font-normal">
+                          (Optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        {...register(`entries.${idx}.remark`)}
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Mark your notes"
+                      />
+                      {errors.entries?.[idx]?.remark && (
+                        <p className="mt-1 text-xs text-red-600">
+                          {errors.entries[idx]?.remark?.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -616,7 +669,7 @@ export default function CreatePlanPage() {
         {/* ========== EXCEL MODE ========== */}
         {tab === "excel" && (
           <div className="space-y-4">
-            <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg p-6">
+            <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-6">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Upload Excel File (.xlsx)
               </label>

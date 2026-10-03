@@ -18,6 +18,7 @@ import type {
   PendingTransportSowing,
 } from "@/app/lib/types/sowing";
 import { Banner } from "@/app/components/ui/banner";
+import { useCaps } from "@/app/lib/hooks/use-permissions";
 import {
   ArrowLeft,
   Truck,
@@ -29,6 +30,10 @@ import {
 
 export default function TrayTransportPage() {
   const router = useRouter();
+  // Tray assignments and tunnel management live on this page.
+  // Moving trays is part of sowing, so it is gated by `sowing.*` (TRAY-05).
+  const caps = useCaps("sowing");
+  const tunnelCaps = useCaps("tunnels");
 
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [assignments, setAssignments] = useState<TunnelAssignment[]>([]);
@@ -214,7 +219,7 @@ export default function TrayTransportPage() {
         </h2>
 
         {pendingGroups.length === 0 ? (
-          <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg p-8 text-center">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-8 text-center">
             <CheckCircle className="mx-auto h-10 w-10 text-green-400 mb-2" />
             <p className="text-gray-500 dark:text-gray-400">
               All sowings are fully assigned. Nothing needs transport.
@@ -224,7 +229,7 @@ export default function TrayTransportPage() {
           pendingGroups.map((group) => (
             <div
               key={group.planId}
-              className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg overflow-hidden"
+              className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden"
             >
               <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 bg-amber-50/50 dark:bg-amber-900/10">
                 <span className="font-semibold text-gray-900 dark:text-white">
@@ -241,7 +246,7 @@ export default function TrayTransportPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {sowing.variety}
+                          {sowing.variety + " " + sowing.code}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           Lot: {sowing.lotNumber} · {sowing.stockType} ·{" "}
@@ -277,7 +282,13 @@ export default function TrayTransportPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteAssignment(a.id)}
-                                  className="ml-0.5 text-green-500 hover:text-red-500"
+                                  disabled={!caps.delete}
+                                  title={
+                                    caps.delete
+                                      ? undefined
+                                      : "You don't have permission to remove assignments"
+                                  }
+                                  className="ml-0.5 text-green-500 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   ×
                                 </button>
@@ -302,7 +313,7 @@ export default function TrayTransportPage() {
                               trays: assigningFor.trays,
                             })
                           }
-                          className="px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                          className="px-2 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                         >
                           <option value="">Tunnel</option>
                           {tunnels.map((t) => {
@@ -334,7 +345,7 @@ export default function TrayTransportPage() {
                               trays: Number(e.target.value),
                             })
                           }
-                          className="w-20 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                          className="w-20 px-2 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                         />
                         <button
                           type="button"
@@ -346,12 +357,18 @@ export default function TrayTransportPage() {
                             )
                           }
                           disabled={
+                            !caps.create ||
                             submitting ||
                             assigningFor.sowingId !== sowing.id ||
                             !assigningFor.tunnelId ||
                             assigningFor.trays <= 0
                           }
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-xs font-semibold rounded-lg transition whitespace-nowrap"
+                          title={
+                            caps.create
+                              ? undefined
+                              : "You don't have permission to assign trays"
+                          }
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-xs font-semibold rounded-lg transition whitespace-nowrap disabled:cursor-not-allowed"
                         >
                           {submitting && assigningFor.sowingId === sowing.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -370,7 +387,7 @@ export default function TrayTransportPage() {
       </section>
 
       {/* ═══ TUNNELS ═══ */}
-      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg p-6 space-y-4">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           Tunnels ({tunnels.length})
         </h2>
@@ -386,7 +403,7 @@ export default function TrayTransportPage() {
               onChange={(e) => setTunnelNumber(e.target.value)}
               placeholder="e.g. T1"
               required
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm w-24"
+              className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm w-24"
             />
           </div>
           <div>
@@ -398,7 +415,7 @@ export default function TrayTransportPage() {
               value={tunnelLocation}
               onChange={(e) => setTunnelLocation(e.target.value)}
               placeholder="e.g. Block A"
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm w-32"
+              className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm w-32"
             />
           </div>
           <div>
@@ -412,12 +429,18 @@ export default function TrayTransportPage() {
               placeholder="5000"
               required
               min="1"
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm w-28"
+              className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm w-28"
             />
           </div>
           <button
             type="submit"
-            className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition text-sm"
+            disabled={!tunnelCaps.create}
+            title={
+              tunnelCaps.create
+                ? undefined
+                : "You don't have permission to add tunnels"
+            }
+            className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4" />
             Add
@@ -474,7 +497,13 @@ export default function TrayTransportPage() {
                         <button
                           type="button"
                           onClick={() => handleDeleteTunnel(t.id, t.number)}
-                          className="text-red-400 hover:text-red-600"
+                          disabled={!tunnelCaps.delete}
+                          title={
+                            tunnelCaps.delete
+                              ? undefined
+                              : "You don't have permission to delete tunnels"
+                          }
+                          className="text-red-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -489,7 +518,7 @@ export default function TrayTransportPage() {
       </div>
 
       {/* ═══ ALL ASSIGNMENTS ═══ */}
-      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             All Assignments ({assignments.length})
@@ -556,7 +585,13 @@ export default function TrayTransportPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteAssignment(a.id)}
-                        className="text-red-400 hover:text-red-600"
+                        disabled={!caps.delete}
+                        title={
+                          caps.delete
+                            ? undefined
+                            : "You don't have permission to remove assignments"
+                        }
+                        className="text-red-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

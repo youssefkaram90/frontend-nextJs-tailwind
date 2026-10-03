@@ -21,6 +21,8 @@ export enum PlanEntryStatus {
   PLANNED = "PLANNED",
   PARTIALLY_EXECUTED = "PARTIALLY_EXECUTED",
   EXECUTED = "EXECUTED",
+  /** Manually closed below the planned quantity. Final. */
+  CLOSED = "CLOSED",
 }
 
 // --- Tunnel & Sector ---
@@ -51,12 +53,14 @@ export interface PlantStock {
   ssmSowingId?: string | null;
   lpmSowingId?: string | null;
   variety: string;
+  /** batch code (SSM batches) — display as "variety <code>" */
+  code?: number | null;
   location: string;
   lotNumber: string;
   stockType: string;
   numberOfTrays?: number | null;
   seedsPerTray?: number | null;
-  lines?: string | null;
+  lines?: number | null;
   metersPerLine?: number | null;
   seedsPerMeter?: number | null;
   expectedPlants: number;
@@ -82,6 +86,8 @@ export interface SowingSSM {
   plan?: SowingPlan;
   planEntryId?: string | null;
   variety: string;
+  /** batch code (SSM) — variety stays plain; display as "variety <code>" */
+  code?: number | null;
   sowingDate: string;
   lotNumber: string;
   stockType: string;
@@ -89,7 +95,7 @@ export interface SowingSSM {
   numberOfTrays: number;
   seedsPerTray: number;
   quantityUsed: number;
-  tunnelId: string | null;
+  tunnelId: string | undefined;
   tunnel?: Tunnel | null;
   tunnelAssignments?: TunnelAssignment[];
   remarks?: string | null;
@@ -111,10 +117,10 @@ export interface SowingLPM {
   stockType: string;
   productType: string;
   quantityUsed: number;
-  sectorId?: string | null;
+  sectorId?: string | undefined;
   sector?: Sector;
-  lines?: string | null;
-  metersPerLine?: number | null;
+  lines?: number | null;
+  meterPerLine: number;
   seedsPerMeter?: number | null;
   remarks?: string | null;
   plantStock?: PlantStock | null;
@@ -154,7 +160,7 @@ export interface SowingPlanEntry {
   executedQuantity?: number | null;
   sectorId?: string | null;
   sector?: Sector | null;
-  lines?: string | null;
+  lines?: number | null;
   metersPerLine?: number | null;
   seedsPerMeter?: number | null;
   ssmSowings?: SowingSSM[];
@@ -180,9 +186,10 @@ export interface CreatePlanEntryDto {
   // LPM
   plannedQuantity?: number;
   sectorId?: string;
-  lines?: string;
+  lines?: number;
   metersPerLine?: number;
   seedsPerMeter?: number;
+  remark?: string;
 }
 
 export interface ExecuteSSMDto {
@@ -190,6 +197,7 @@ export interface ExecuteSSMDto {
   planEntryId?: string;
   tunnelId?: string;
   variety: string;
+  code?: number;
   lotNumber: string;
   stockType?: string;
   numberOfTrays: number;
@@ -207,11 +215,28 @@ export interface ExecuteLPMDto {
   stockType?: string;
   quantityUsed: number;
   sowingDate: Date;
-  lines?: string;
-  metersPerLine?: number;
+  lines?: number;
+  meterPerLine?: number;
   seedsPerMeter?: number;
   remarks?: string;
 }
+
+/**
+ * The PATCH payloads. Every field is optional (SSM-03): the server keeps what a
+ * request leaves out, which is exactly why the edit forms must send an explicit
+ * `null` to clear a tunnel or a sector — an omitted field means "keep".
+ *
+ * The two ids are re-declared outside the `Omit` because `ExecuteSSMDto` says
+ * `string | undefined` and `string | null | undefined` is not assignable to it —
+ * the same shape as `UpdateSSMDto` / `UpdateLPMDto` on the server.
+ */
+export type UpdateSowingSSMDto = Partial<Omit<ExecuteSSMDto, "tunnelId">> & {
+  tunnelId?: string | null;
+};
+
+export type UpdateSowingLPMDto = Partial<Omit<ExecuteLPMDto, "sectorId">> & {
+  sectorId?: string | null;
+};
 
 // --- Pending entries (executor dashboard) ---
 
@@ -229,6 +254,7 @@ export interface PendingTransportSowing {
   planId: string;
   planName: string;
   variety: string;
+  code: number | null;
   lotNumber: string;
   stockType: string;
   numberOfTrays: number;

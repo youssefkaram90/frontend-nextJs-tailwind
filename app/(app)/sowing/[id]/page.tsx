@@ -11,12 +11,14 @@ import {
 import type { SowingSSM, SowingLPM } from "@/app/lib/types/sowing";
 import { ArrowLeft, Sprout, Pencil, Trash2, Layers } from "lucide-react";
 import { DetailCardSkeleton } from "@/app/components/skeleton";
+import { useCaps } from "@/app/lib/hooks/use-permissions";
 
 export default function SowingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const type = searchParams.get("type") ?? "SSM";
   const router = useRouter();
+  const caps = useCaps("sowing");
   const [sowing, setSowing] = useState<SowingSSM | SowingLPM | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,20 +134,26 @@ export default function SowingDetailPage() {
           </div>
         </div>
 
-        <div className="flex gap-3 mb-6">
-          <button
-            onClick={() => router.push(`/sowing/${id}/edit?type=${type}`)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/30 dark:hover:bg-green-900/50 rounded-lg transition"
-          >
-            <Pencil className="h-4 w-4" /> Edit
-          </button>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-lg transition"
-          >
-            <Trash2 className="h-4 w-4" /> Delete
-          </button>
-        </div>
+        {(caps.edit || caps.delete) && (
+          <div className="flex gap-3 mb-6">
+            {caps.edit && (
+              <button
+                onClick={() => router.push(`/sowing/${id}/edit?type=${type}`)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/30 dark:hover:bg-green-900/50 rounded-lg transition"
+              >
+                <Pencil className="h-4 w-4" /> Edit
+              </button>
+            )}
+            {caps.delete && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-lg transition"
+              >
+                <Trash2 className="h-4 w-4" /> Delete
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
@@ -237,6 +245,14 @@ export default function SowingDetailPage() {
                 </p>
                 <p className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
                   {(sowing as SowingLPM).lines ?? "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Lines Length
+                </p>
+                <p className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+                  {(sowing as SowingLPM).meterPerLine ?? "—"}
                 </p>
               </div>
               <div>

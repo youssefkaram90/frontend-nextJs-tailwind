@@ -49,8 +49,8 @@ export function PageHeader({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg 
-                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+              className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl
+                focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
                 disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
             >
               {isSubmitting ? "Saving..." : submitLabel}

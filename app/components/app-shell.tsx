@@ -3,6 +3,7 @@
 import React from "react";
 import Header from "@/app/components/header";
 import Sidebar from "@/app/components/sidebar";
+import PermissionGate from "@/app/components/permission-gate";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 pl-64">
         <Header />
-        {children}
+        <PermissionGate>{children}</PermissionGate>
       </main>
     </div>
   );

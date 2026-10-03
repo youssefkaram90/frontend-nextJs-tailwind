@@ -31,7 +31,7 @@ export default function CreateDeliveryPage() {
     defaultValues: {
       deliveryDate: new Date().toLocaleDateString("en-CA"),
       deliveryCode: "",
-      remark: "",
+      transport: "",
       lots: [
         {
           stockType: "CVT",
@@ -41,6 +41,7 @@ export default function CreateDeliveryPage() {
           productName: "",
           supplierName: "",
           thousandSeedsPerGram: "",
+          remark: "",
         },
       ],
     },
@@ -89,7 +90,7 @@ export default function CreateDeliveryPage() {
       const payload = {
         deliveryDate: data.deliveryDate,
         deliveryCode: data.deliveryCode,
-        ...(data.remark ? { remark: data.remark } : {}),
+        transport: data.transport,
         lots: data.lots.map((lot) => ({
           stockType: lot.stockType as StockType,
           lotNumber: lot.lotNumber,
@@ -101,6 +102,7 @@ export default function CreateDeliveryPage() {
           lot.thousandSeedsPerGram > 0
             ? { thousandSeedsPerGram: lot.thousandSeedsPerGram }
             : {}),
+          remark: lot.remark,
         })),
       };
 
@@ -151,8 +153,8 @@ export default function CreateDeliveryPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg 
-              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl
+              focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
               disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
           >
             {submitting ? "Creating..." : "Create Delivery"}
@@ -173,14 +175,14 @@ export default function CreateDeliveryPage() {
             {/*Delivery Code */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Delivery Code *
+                Delivery Code{" "}
+                <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="text"
                 {...register("deliveryCode")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="e.g. D001"
               />
               {errors.deliveryCode && (
                 <p className="mt-1 text-sm text-red-600">
@@ -192,14 +194,13 @@ export default function CreateDeliveryPage() {
             {/*Delivery Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Delivery Date *
+                Delivery Date{" "}
+                <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="date"
                 {...register("deliveryDate")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               {errors.deliveryDate && (
                 <p className="mt-1 text-sm text-red-600">
@@ -208,19 +209,17 @@ export default function CreateDeliveryPage() {
               )}
             </div>
 
-            {/* Remark */}
+            {/* Means of Transport */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Remark
-                <span className="text-gray-400 font-normal"> (optional)</span>
+                Transport
+                <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="text"
-                {...register(`remark`)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                placeholder="Mark your notes"
+                {...register(`transport`)}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Means Of Transport"
               />
             </div>
           </div>
@@ -237,14 +236,15 @@ export default function CreateDeliveryPage() {
                 append({
                   stockType: "CVT",
                   lotNumber: "",
-                  quantity: undefined as unknown as number,
+                  quantity: "",
                   productType: "SEEDS",
                   productName: "",
                   supplierName: "",
                   thousandSeedsPerGram: "",
+                  remark: "",
                 })
               }
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
             >
               <Plus className="h-4 w-4" />
               Add Lot
@@ -307,7 +307,7 @@ export default function CreateDeliveryPage() {
                             source?.thousandSeedsPerGram ?? "",
                         });
                       }}
-                      className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"
+                      className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
                       title="Duplicate lot"
                     >
                       <Copy className="h-4 w-4" />
@@ -337,15 +337,14 @@ export default function CreateDeliveryPage() {
                     {/* Product Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Product Name *
+                        Product Name{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
                       <input
                         type="text"
                         {...register(`lots.${index}.productName`)}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                        placeholder="e.g. Tomato Roma"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="e.g. Krypton"
                       />
                       {errors.lots?.[index]?.productName && (
                         <p className="mt-1 text-xs text-red-600">
@@ -357,14 +356,13 @@ export default function CreateDeliveryPage() {
                     {/* Lot Number */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Lot Number *
+                        Lot Number{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
                       <input
                         type="text"
                         {...register(`lots.${index}.lotNumber`)}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                         placeholder="e.g. L-2024-001"
                       />
                       {errors.lots?.[index]?.lotNumber && (
@@ -374,32 +372,22 @@ export default function CreateDeliveryPage() {
                       )}
                     </div>
 
-                    {/*Stock Type (CVT | BIO*/}
+                    {/* Stock Type (CVT | BIO) */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Stock Type
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Stock Type{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
-                      <div className="flex gap-4">
-                        {(["CVT", "BIO"] as const).map((type) => (
-                          <label
-                            key={type}
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
-                            <input
-                              type="radio"
-                              value={type}
-                              {...register(`lots.${index}.stockType`)}
-                              className="text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">
-                              {type}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
+                      <select
+                        {...register(`lots.${index}.stockType`, {})}
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value="CVT">CVT</option>
+                        <option value="BIO">BIO</option>
+                      </select>
                       {errors.lots?.[index]?.stockType && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {errors.lots[index].stockType.message}
+                        <p className="mt-1 text-xs text-red-600">
+                          {errors.lots[index]?.stockType?.message}
                         </p>
                       )}
                     </div>
@@ -407,16 +395,15 @@ export default function CreateDeliveryPage() {
                     {/* Quantity */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Quantity *
+                        Quantity{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
                       <input
                         type="number"
                         {...register(`lots.${index}.quantity`, {
                           valueAsNumber: true,
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                         placeholder="0"
                       />
                       {errors.lots?.[index]?.quantity && (
@@ -429,7 +416,8 @@ export default function CreateDeliveryPage() {
                     {/* Product Type */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Product Type *
+                        Product Type{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
                       <select
                         {...register(`lots.${index}.productType`, {
@@ -442,9 +430,7 @@ export default function CreateDeliveryPage() {
                             }
                           },
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                       >
                         <option value="SEEDS">Seeds</option>
                         <option value="PEAT">Peat</option>
@@ -459,14 +445,13 @@ export default function CreateDeliveryPage() {
                     {/* Supplier Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Supplier Name *
+                        Supplier Name{" "}
+                        <span className="text-red-400 font-normal"> *</span>
                       </label>
                       <input
                         type="text"
                         {...register(`lots.${index}.supplierName`)}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                         placeholder="Supplier"
                       />
                       {errors.lots?.[index]?.supplierName && (
@@ -490,13 +475,28 @@ export default function CreateDeliveryPage() {
                           type="number"
                           step="any"
                           {...register(`lots.${index}.thousandSeedsPerGram`)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                           placeholder="e.g. 2.56"
                         />
                       </div>
                     )}
+                    {/* Remark for each lot */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Remark
+                        <span className="text-gray-400 font-normal">
+                          {" "}
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        step="any"
+                        {...register(`lots.${index}.remark`)}
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Mark your notes"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -514,8 +514,8 @@ export default function CreateDeliveryPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg 
-                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+              className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl
+                focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
                 disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
             >
               {submitting ? "Creating..." : "Create Delivery"}

@@ -2,7 +2,11 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { AUTH_EXPIRED_EVENT, AuthExpiredError } from "@/app/lib/api";
+import {
+  AUTH_EXPIRED_EVENT,
+  PERMISSIONS_STALE_EVENT,
+  AuthExpiredError,
+} from "@/app/lib/api";
 
 export function QueryProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -23,10 +27,17 @@ export function QueryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const clearSessionQueries = () => queryClient.clear();
+    // Permissions changed mid-session → re-read the current user so the UI
+    // stops offering actions the server now rejects.
+    const refreshCurrentUser = () =>
+      queryClient.invalidateQueries({ queryKey: ["users", "me"] });
 
     window.addEventListener(AUTH_EXPIRED_EVENT, clearSessionQueries);
-    return () =>
+    window.addEventListener(PERMISSIONS_STALE_EVENT, refreshCurrentUser);
+    return () => {
       window.removeEventListener(AUTH_EXPIRED_EVENT, clearSessionQueries);
+      window.removeEventListener(PERMISSIONS_STALE_EVENT, refreshCurrentUser);
+    };
   }, [queryClient]);
 
   return (

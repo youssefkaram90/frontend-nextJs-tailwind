@@ -5,9 +5,10 @@ import {
   getPlanEntries,
   createSowingPlan,
   addPlanEntry,
-  addBulkPlanEntries,
   updatePlanStatus,
   deletePlanEntry,
+  closePlanEntry,
+  reopenPlanEntry,
   deleteSowingPlan,
 } from "@/app/lib/services/sowing";
 
@@ -58,22 +59,6 @@ export function useAddPlanEntry() {
   });
 }
 
-export function useAddBulkPlanEntries() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      planId,
-      dtos,
-    }: {
-      planId: string;
-      dtos: Parameters<typeof addBulkPlanEntries>[1];
-    }) => addBulkPlanEntries(planId, dtos),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["sowing-plans", vars.planId] });
-    },
-  });
-}
-
 export function useUpdatePlanStatus() {
   const qc = useQueryClient();
   return useMutation({
@@ -90,6 +75,27 @@ export function useDeletePlanEntry() {
   return useMutation({
     mutationFn: deletePlanEntry,
     onSuccess: (_data, _vars, _ctx) => {
+      qc.invalidateQueries({ queryKey: ["sowing-plans"] });
+    },
+  });
+}
+
+export function useClosePlanEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: closePlanEntry,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sowing-plans"] });
+    },
+  });
+}
+
+/** Undo a manual close (SPLAN-12). */
+export function useReopenPlanEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: reopenPlanEntry,
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sowing-plans"] });
     },
   });

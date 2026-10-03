@@ -23,6 +23,7 @@ import {
   type EditSowingFormData,
   DEFAULT_SEEDS_PER_TRAY,
 } from "@/app/schemas/sowing.schema";
+import { seedsPerRowMetre } from "@/app/lib/sowing-constants";
 
 export default function EditSowingPage() {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +60,8 @@ export default function EditSowingPage() {
       numberOfTrays: 0,
       seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
       quantityUsed: 0,
+      lines: 0,
+      meterPerLine: 0,
       remarks: "",
     },
   });
@@ -73,6 +76,21 @@ export default function EditSowingPage() {
     isSSM && numberOfTrays && seedsPerTray
       ? Number(numberOfTrays) * (Number(seedsPerTray) || DEFAULT_SEEDS_PER_TRAY)
       : null;
+
+  const nLines = useWatch({ control, name: "lines" }) as number | undefined;
+  const metersPerLine = useWatch({ control, name: "meterPerLine" }) as
+    | number
+    | undefined;
+  const LPMSeeds = useWatch({ control, name: "quantityUsed" }) as
+    | number
+    | undefined;
+  const computedSeedsPerMeter = seedsPerRowMetre(
+    Number(LPMSeeds),
+    Number(nLines),
+    Number(metersPerLine),
+  );
+  const calculatedSeedsPerMeter =
+    !isSSM && computedSeedsPerMeter > 0 ? computedSeedsPerMeter : null;
 
   useEffect(() => {
     const sowing = sowingQuery.data;
@@ -91,6 +109,8 @@ export default function EditSowingPage() {
         ? (sowing as SowingSSM).seedsPerTray
         : DEFAULT_SEEDS_PER_TRAY,
       quantityUsed: !isSSM ? sowing.quantityUsed : 0,
+      lines: !isSSM ? ((sowing as SowingLPM).lines ?? 0) : 0,
+      meterPerLine: !isSSM ? (sowing as SowingLPM).meterPerLine : 0,
       tunnelId: isSSM ? (sowing as SowingSSM).tunnelId : "",
       sectorId: !isSSM ? (sowing as SowingLPM).sectorId : "",
     });
@@ -104,7 +124,8 @@ export default function EditSowingPage() {
         await updateSowingSSM(id, {
           planId: data.planId,
           planEntryId: undefined,
-          tunnelId: data.tunnelId || undefined,
+          // `null` clears the tunnel; an omitted field would mean "keep" (SSM-08).
+          tunnelId: data.tunnelId || null,
           variety: data.variety,
           lotNumber: data.lotNumber,
           numberOfTrays: Number(data.numberOfTrays ?? 0),
@@ -116,10 +137,13 @@ export default function EditSowingPage() {
         await updateSowingLPM(id, {
           planId: data.planId,
           planEntryId: undefined,
-          sectorId: data.sectorId!,
+          // `null` clears the sector; an omitted field would mean "keep" (SSM-08).
+          sectorId: data.sectorId || null,
           variety: data.variety,
           lotNumber: data.lotNumber,
           quantityUsed: Number(data.quantityUsed ?? 0),
+          lines: Number(data.lines ?? 0),
+          meterPerLine: Number(data.meterPerLine ?? 0),
           sowingDate: new Date(data.sowingDate),
           remarks: data.remarks,
         });
@@ -137,7 +161,7 @@ export default function EditSowingPage() {
   if (loading)
     return (
       <div className="p-4 flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
       </div>
     );
 
@@ -162,7 +186,7 @@ export default function EditSowingPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
+            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
           >
             {submitting ? "Saving..." : "Save Changes"}
           </button>
@@ -179,12 +203,12 @@ export default function EditSowingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Variety *
+                Variety <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="text"
                 {...register("variety")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="e.g. Ginka"
               />
               {errors.variety && (
@@ -195,12 +219,12 @@ export default function EditSowingPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Sowing Date *
+                Sowing Date <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="date"
                 {...register("sowingDate")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               {errors.sowingDate && (
                 <p className="mt-1 text-xs text-red-600">
@@ -210,12 +234,12 @@ export default function EditSowingPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Lot Number *
+                Lot Number <span className="text-red-400 font-normal"> *</span>
               </label>
               <input
                 type="text"
                 {...register("lotNumber")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="e.g. 861.000"
               />
               {errors.lotNumber && (
@@ -226,11 +250,11 @@ export default function EditSowingPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Stock Type *
+                Stock Type <span className="text-red-400 font-normal"> *</span>
               </label>
               <select
                 {...register("stockType")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="BIO">BIO</option>
                 <option value="CVT">CVT</option>
@@ -244,7 +268,7 @@ export default function EditSowingPage() {
                   </label>
                   <select
                     {...register("tunnelId")}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="">Not assigned yet...</option>
                     {tunnels.map((t) => (
@@ -256,12 +280,13 @@ export default function EditSowingPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Number of Trays *
+                    Number of Trays{" "}
+                    <span className="text-red-400 font-normal"> *</span>
                   </label>
                   <input
                     type="number"
                     {...register("numberOfTrays")}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="e.g. 50"
                     min={1}
                   />
@@ -278,7 +303,7 @@ export default function EditSowingPage() {
                   <input
                     type="number"
                     {...register("seedsPerTray")}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder={`${DEFAULT_SEEDS_PER_TRAY}`}
                     min={1}
                   />
@@ -311,11 +336,11 @@ export default function EditSowingPage() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Sector *
+                    Sector <span className="text-red-400 font-normal"> *</span>
                   </label>
                   <select
                     {...register("sectorId")}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="">Select a sector...</option>
                     {sectors.map((s) => (
@@ -326,14 +351,16 @@ export default function EditSowingPage() {
                     ))}
                   </select>
                 </div>
+                {/**Quantity of seeds */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Quantity of Seeds *
+                    Quantity of Seeds{" "}
+                    <span className="text-red-400 font-normal"> *</span>
                   </label>
                   <input
                     type="number"
                     {...register("quantityUsed")}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="e.g. 5000"
                     min={1}
                   />
@@ -343,6 +370,62 @@ export default function EditSowingPage() {
                     </p>
                   )}
                 </div>
+                {/**Lines */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Lines <span className="text-red-400 font-normal"> *</span>
+                  </label>
+                  <input
+                    type="number"
+                    {...register("lines")}
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="e.g. 5000"
+                    min={1}
+                  />
+                  {errors.lines && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors.lines.message}
+                    </p>
+                  )}
+                </div>
+                {/**Line Length */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Line Meters{" "}
+                    <span className="text-red-400 font-normal"> *</span>
+                  </label>
+                  <input
+                    type="number"
+                    {...register("meterPerLine")}
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="e.g. 5000"
+                    min={1}
+                  />
+                  {errors.meterPerLine && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors.meterPerLine.message}
+                    </p>
+                  )}
+                </div>
+
+                {calculatedSeedsPerMeter && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      *
+                    </label>
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-1.5 flex items-center gap-3">
+                      <Info className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                          Seeds/Meter:{" "}
+                          <span className="font-bold">
+                            {calculatedSeedsPerMeter.toLocaleString()}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             <div className="sm:col-span-2 lg:col-span-3">
@@ -353,7 +436,7 @@ export default function EditSowingPage() {
               <textarea
                 {...register("remarks")}
                 rows={3}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm resize-none"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
                 placeholder="Any additional notes..."
               />
             </div>

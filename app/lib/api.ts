@@ -1,5 +1,21 @@
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim();
 export const AUTH_EXPIRED_EVENT = "auth-expired";
+export const PERMISSIONS_STALE_EVENT = "permissions-stale";
+
+let lastPermissionsStaleAt = 0;
+
+/**
+ * A 403 almost always means the user's permissions changed since the UI was
+ * rendered. Tell the app to refresh the cached user so it stops offering
+ * actions the server now rejects. Debounced — one page can fire several 403s.
+ */
+function notifyPermissionsStale() {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (now - lastPermissionsStaleAt < 5_000) return;
+  lastPermissionsStaleAt = now;
+  window.dispatchEvent(new Event(PERMISSIONS_STALE_EVENT));
+}
 
 export class AuthExpiredError extends Error {
   constructor(message = "Session expired. Please sign in again.") {
@@ -91,12 +107,19 @@ export async function api<T>(
     throw new AuthExpiredError();
   }
 
+  if (response.status === 403) {
+    notifyPermissionsStale();
+  }
+
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    // NestJS validation errors have message as array
+    // `body.message` is the server's own plain sentence, and it is the ONLY
+    // thing the user should ever be shown (P5-09). The fallback is the last
+    // resort for a response that carried no message at all — never a developer
+    // string like "Request Failed".
     const msg = Array.isArray(error?.message)
       ? error.message.join("; ")
-      : error?.message || "Request Failed";
+      : error?.message || "Something went wrong. Please try again.";
     throw new Error(msg);
   }
 

@@ -18,9 +18,9 @@ export function SearchBar({ placeholder = "Search..." }: Props) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
+        className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 
           bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm
-          focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
       />
     </div>
   );

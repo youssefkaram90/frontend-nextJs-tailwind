@@ -36,6 +36,7 @@ function groupByVariety(rows: PlantStockRow[]): VarietyRow[] {
         lots: 0,
       } as VarietyRow);
     cur.initialStock += r.expectedPlants;
+    cur.harvested += r.harvested ?? 0;
     cur.lots += 1;
     map.set(r.variety, cur);
   }
@@ -59,11 +60,15 @@ function groupByLocation(rows: PlantStockRow[]): LocationRow[] {
     cur.trays += r.numberOfTrays ?? 0;
     cur.sowings += 1;
     cur.varieties = cur.varieties
-      ? `${cur.varieties}, ${r.variety}`
-      : r.variety;
+      ? `${cur.varieties}, ${r.variety} ${r.code}`
+      : `${r.variety} ${r.code}`;
     map.set(loc, cur);
   }
-  return [...map.values()].sort((a, b) => b.initialStock - a.initialStock);
+  return [...map.values()].sort((a, b) => {
+    const tunnelA = parseInt(a.location.replace(/\D/g, "")) || 0;
+    const tunnelB = parseInt(b.location.replace(/\D/g, "")) || 0;
+    return tunnelA - tunnelB;
+  });
 }
 
 function thClass() {
@@ -211,8 +216,7 @@ export default function PlantStockPage() {
                 Per Variety
               </h2>
               <span className="text-xs text-gray-400 ml-auto">
-                Harvest tracking coming soon — remain currently equals initial
-                stock
+                Remain = Initial Stock − Harvested
               </span>
             </div>
             <div className="overflow-x-auto">

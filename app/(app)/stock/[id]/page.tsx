@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useStockItem } from "@/app/lib/hooks/use-stock";
 import { ArrowLeft, Package } from "lucide-react";
 import { DetailCardSkeleton, TableSkeleton } from "@/app/components/skeleton";
-
+import { movementReasonLabel } from "@/app/lib/types/stock";
 const formatQty = (value: number, isPeat: boolean) =>
   isPeat ? value.toFixed(2) : value.toLocaleString();
 
@@ -18,7 +18,7 @@ export default function StockDetailPage() {
       <div className="p-4 space-y-6">
         <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
         <DetailCardSkeleton />
-        <TableSkeleton rows={3} cols={4} />
+        <TableSkeleton rows={3} cols={5} />
       </div>
     );
   }
@@ -57,8 +57,8 @@ export default function StockDetailPage() {
       {/* Item Details Card */}
       <div className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center">
-            <Package className="h-7 w-7 text-indigo-600" />
+          <div className="w-14 h-14 bg-green-100 dark:bg-green-900/50 rounded-xl flex items-center justify-center">
+            <Package className="h-7 w-7 text-green-600" />
           </div>
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -78,6 +78,11 @@ export default function StockDetailPage() {
               >
                 {item.stockType}
               </span>
+              {item.season && (
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                  Season {item.season.code}
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 mt-2">
               Supplier: {item.supplierName}
@@ -100,6 +105,12 @@ export default function StockDetailPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Movements
           </h2>
+          {item.season && (
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Every movement belongs to season {item.season.code} — a lot is
+              never carried across seasons.
+            </p>
+          )}
         </div>
 
         {!item.movements || item.movements.length === 0 ? (
@@ -114,6 +125,8 @@ export default function StockDetailPage() {
                   <th className="px-6 py-3 text-left font-medium">Date</th>
                   <th className="px-6 py-3 text-right font-medium">Quantity</th>
                   <th className="px-6 py-3 text-left font-medium">Type</th>
+                  <th className="px-6 py-3 text-left font-medium">By</th>
+                  <th className="px-6 py-3 text-left font-medium">Reason</th>
                   <th className="px-6 py-3 text-left font-medium">Reference</th>
                 </tr>
               </thead>
@@ -154,6 +167,20 @@ export default function StockDetailPage() {
                         {movement.referenceType}
                       </span>
                     </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                      {movement.createdByName}
+                    </td>
+
+                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                      {movementReasonLabel(movement.reason)}
+                      {movement.note && (
+                        <span className="block text-xs text-gray-400">
+                          {movement.note}
+                        </span>
+                      )}
+                    </td>
+
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono text-xs">
                       {movement.referenceId
                         ? movement.referenceId.slice(0, 12) + "…"

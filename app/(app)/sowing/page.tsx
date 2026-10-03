@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSowingSSMs, useSowingLPMs } from "@/app/lib/hooks/use-sowing";
-import { getPendingPlanEntries } from "@/app/lib/services/sowing";
+import {
+  getPendingPlanEntries,
+  closePlanEntry,
+} from "@/app/lib/services/sowing";
 import type {
   SowingSSM,
   SowingLPM,
@@ -16,9 +19,11 @@ import {
   Play,
   Sprout,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { TableSkeleton } from "@/app/components/skeleton";
 import { useSearch } from "@/app/lib/use-search";
+import { useCaps } from "@/app/lib/hooks/use-permissions";
 
 type UnifiedSowing =
   | (SowingSSM & { _type: "SSM"; _location: string })
@@ -26,6 +31,7 @@ type UnifiedSowing =
 
 export default function SowingsPage() {
   const router = useRouter();
+  const caps = useCaps("sowing");
   const { query, setQuery, debouncedQuery } = useSearch();
   const {
     data: ssmData = [],
@@ -40,13 +46,46 @@ export default function SowingsPage() {
 
   const [pendingGroups, setPendingGroups] = useState<PendingPlanGroup[]>([]);
   const [pendingLoading, setPendingLoading] = useState(true);
+  const [closingEntryId, setClosingEntryId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadPending = useCallback(() => {
+    setPendingLoading(true);
     getPendingPlanEntries()
       .then(setPendingGroups)
       .catch(() => setPendingGroups([]))
       .finally(() => setPendingLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadPending();
+  }, [loadPending]);
+
+  const handleCloseEntry = async (entryId: string) => {
+    if (
+      !confirm(
+        "Close this entry without reaching the planned quantity? You can reopen it later if this was a mistake.",
+      )
+    )
+      return;
+
+    setClosingEntryId(entryId);
+    try {
+      await closePlanEntry(entryId);
+      // Pending entries are not cached by react-query, so drop the row locally.
+      setPendingGroups((prev) =>
+        prev
+          .map((group) => ({
+            ...group,
+            entries: group.entries.filter((e) => e.id !== entryId),
+          }))
+          .filter((group) => group.entries.length > 0),
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to close entry");
+    } finally {
+      setClosingEntryId(null);
+    }
+  };
 
   const isPending = ssmLoading || lpmLoading;
   const error = ssmError || lpmError;
@@ -137,18 +176,20 @@ export default function SowingsPage() {
             <FileSpreadsheet className="h-4 w-4" />
             Plans
           </button>
-          <button
-            onClick={() => router.push("/sowing/create")}
-            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 text-sm"
-          >
-            <Plus className="h-4 w-4" /> New Sowing
-          </button>
+          {caps.create && (
+            <button
+              onClick={() => router.push("/sowing/create")}
+              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 text-sm"
+            >
+              <Plus className="h-4 w-4" /> New Sowing
+            </button>
+          )}
         </div>
       </div>
 
       {/* ═══ PENDING TASKS ═══ */}
       {pendingLoading ? (
-        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg p-8 flex items-center justify-center">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-8 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-green-600" />
         </div>
       ) : pendingGroups.length > 0 ? (
@@ -162,7 +203,7 @@ export default function SowingsPage() {
           {pendingGroups.map((group) => (
             <div
               key={group.planId}
-              className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg overflow-hidden"
+              className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden"
             >
               <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 bg-amber-50/50 dark:bg-amber-900/10">
                 <div className="flex items-center justify-between">
@@ -307,17 +348,36 @@ export default function SowingsPage() {
                           </>
                         )}
                         <td className="px-5 py-3 text-right">
-                          <button
-                            onClick={() =>
-                              router.push(
-                                `/sowing/create?planId=${group.planId}&planEntryId=${entry.id}`,
-                              )
-                            }
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition"
-                          >
-                            <Play className="h-3.5 w-3.5" />
-                            Execute
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            {caps.create && (
+                              <button
+                                onClick={() =>
+                                  router.push(
+                                    `/sowing/create?planId=${group.planId}&planEntryId=${entry.id}`,
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition"
+                              >
+                                <Play className="h-3.5 w-3.5" />
+                                Execute
+                              </button>
+                            )}
+                            {caps.edit && (
+                              <button
+                                onClick={() => handleCloseEntry(entry.id)}
+                                disabled={closingEntryId === entry.id}
+                                title="Close without reaching the planned quantity"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {closingEntryId === entry.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                )}
+                                Close
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -328,7 +388,7 @@ export default function SowingsPage() {
           ))}
         </section>
       ) : (
-        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg p-8 text-center">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-8 text-center">
           <Sprout className="mx-auto h-10 w-10 text-green-300 dark:text-green-600 mb-2" />
           <p className="text-gray-500 dark:text-gray-400">
             All plan entries have been executed. Great job!
@@ -360,7 +420,7 @@ export default function SowingsPage() {
               No sowings recorded yet.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border-t border-gray-100 dark:border-gray-700">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300">
@@ -409,7 +469,9 @@ export default function SowingsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                        {sowing.variety}
+                        {sowing._type === "SSM"
+                          ? sowing.variety + " " + sowing.code
+                          : sowing.variety}
                       </td>
                       <td className="px-6 py-4">
                         <span
@@ -423,7 +485,7 @@ export default function SowingsPage() {
                       <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
                         {sowing._location}
                       </td>
-                      <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
+                      <td className="px-6 py-4 text-left font-semibold text-gray-900 dark:text-white">
                         {sowing._type === "SSM" &&
                         (sowing as SowingSSM).numberOfTrays ? (
                           <span className="font-semibold">
@@ -465,7 +527,7 @@ export default function SowingsPage() {
 
         {/* Older sowings */}
         {olderSowings.length > 0 && (
-          <details className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+          <details className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
             <summary className="px-6 py-4 cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 select-none">
               Older sowings ({olderSowings.length})
             </summary>
@@ -491,34 +553,40 @@ export default function SowingsPage() {
                         )}
                       </td>
                       <td
-                        className="px-6 py-4 max-w-[140px] truncate"
+                        className="px-6 py-4 text-gray-700 dark:text-gray-300 max-w-[140px] truncate"
                         title={sowing.plan?.name}
                       >
                         {sowing.plan?.name ?? "—"}
                       </td>
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                        {sowing.variety}
+                        {sowing._type === "SSM"
+                          ? sowing.variety + " " + sowing.code
+                          : sowing.variety}
                       </td>
                       <td className="px-6 py-4">
                         <span
                           className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${sowing._type === "SSM" ? "bg-teal-100 text-teal-800" : "bg-yellow-100 text-yellow-800"}`}
                         >
-                          {sowing._type}
+                          {sowing._type === "SSM"
+                            ? "SSM (Tunnel)"
+                            : "LPM (Field)"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-semibold">
+                      <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
                         {sowing._location}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-left text-gray-900 dark:text-white">
                         {sowing._type === "SSM"
                           ? ((sowing as SowingSSM).numberOfTrays ?? "—")
                           : "—"}
                       </td>
-                      <td className="px-6 py-4">{sowing.lotNumber}</td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-gray-900 dark:text-white">
+                        {sowing.lotNumber}
+                      </td>
+                      <td className="px-6 py-4 text-right text-gray-900 dark:text-white">
                         {sowing.quantityUsed?.toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right text-gray-900 dark:text-white">
                         {Math.round(
                           sowing.quantityUsed *
                             (sowing._type === "SSM" ? 0.82 : 0.8),

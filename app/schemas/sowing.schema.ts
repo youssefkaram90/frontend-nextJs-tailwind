@@ -6,11 +6,30 @@ export const DEFAULT_SEEDS_PER_TRAY = 285;
 const ssmRecordSchema = z.object({
   planEntryId: z.string().optional(),
   variety: z.string().min(1, "Variety is required"),
+  /**
+   * Batch code (SSM) — prints on the batch as "Variety <code>".
+   *
+   * Required, with its own wording (SSM-08): the server made it required in
+   * SSM-02, but the form still let it through empty, so the user got the API's
+   * single generic sentence instead of being told which field was missing.
+   * `Number("")` is 0 and `Number("abc")` is NaN, so both fail the same check
+   * and are told the same thing.
+   */
+  code: z.preprocess(
+    (v) => Number(v),
+    z
+      .number()
+      .refine(
+        (n) => Number.isInteger(n) && n > 0,
+        "Enter the batch code as a number, for example 12",
+      ),
+  ),
   lotNumber: z.string().min(1, "Lot number is required"),
   stockType: z.string().optional(),
   tunnelId: z.string().optional(),
   numberOfTrays: z.coerce.number().int().min(1, "Must be at least 1"),
   seedsPerTray: z.coerce.number().int().min(1).default(DEFAULT_SEEDS_PER_TRAY),
+  remarks: z.string().optional(),
 });
 
 // ── LPM record: field / direct sowing ──
@@ -21,22 +40,19 @@ const lpmRecordSchema = z.object({
   stockType: z.string().optional(),
   sectorId: z.string().optional(),
   quantityUsed: z.coerce.number().int().min(1, "Must be at least 1"),
-  lines: z.string().min(1, "Lines is required"),
+  lines: z.coerce.number().min(1, "Must be at least 1"),
   metersPerLine: z.preprocess(
-    (v) => (v === "" ? undefined : v),
-    z.coerce.number().min(0, "Must be at least 0"),
-  ),
-  seedsPerMeter: z.preprocess(
     (v) => (v === "" ? undefined : v),
     z.coerce.number().min(1, "Must be at least 1"),
   ),
+  seedsPerMeter: z.number().optional(),
+  remarks: z.string().optional(),
 });
 
 // ── Common fields shared by both sowing types ──
 const sowingBaseFields = {
   planId: z.string().min(1, "Plan is required"),
   sowingDate: z.string().min(1, "Sowing date is required"),
-  remarks: z.string().optional(),
 };
 
 // ── Full schemas per type ──
@@ -67,9 +83,11 @@ export const editSowingSchema = z.object({
   stockType: z.enum(["BIO", "CVT"]),
   tunnelId: z.string().optional(),
   sectorId: z.string().optional(),
-  numberOfTrays: z.coerce.number().int().min(0).optional(),
+  numberOfTrays: z.coerce.number().int().min(1).optional(),
   seedsPerTray: z.coerce.number().int().min(1).default(DEFAULT_SEEDS_PER_TRAY),
   quantityUsed: z.coerce.number().int().min(0).default(0),
+  lines: z.coerce.number().int().min(0).default(0),
+  meterPerLine: z.coerce.number().int().min(0).default(0),
   remarks: z.string().optional(),
 });
 
@@ -84,6 +102,5 @@ export type SowingCreateFormInput = {
   planId: string;
   sowingType: "SSM" | "LPM";
   sowingDate: string;
-  remarks?: string;
   records: SowingRecordFormInput[];
 };

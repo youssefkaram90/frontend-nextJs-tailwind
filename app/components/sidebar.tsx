@@ -4,16 +4,25 @@ import {
   LayoutDashboardIcon,
   Warehouse,
   Truck,
+  PackageCheck,
   Sprout,
   Users,
   Moon,
   Sun,
   ArrowRightLeft,
   Flower2,
+  Droplets,
+  Wheat,
+  FlaskConical,
+  Beaker,
+  CalendarRange,
 } from "lucide-react";
 import Link from "next/link";
+import { usePermissions } from "@/app/lib/hooks/use-permissions";
+import type { PermissionName } from "@/app/lib/permissions";
 
 function Sidebar() {
+  const { can, isAdmin } = usePermissions();
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -32,18 +41,97 @@ function Sidebar() {
 
   const toggleDarkMode = () => setDark((prev) => !prev);
 
-  const navItems = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboardIcon },
-    { name: "Deliveries", path: "/deliveries", icon: Truck },
-    { name: "Sowing", path: "/sowing", icon: Sprout },
+  // `permission: null` = always visible. Items without a permission are hidden
+  // for users who cannot view that module (ADMIN sees everything).
+  const navItems: {
+    name: string;
+    path: string;
+    icon: React.ComponentType<any>;
+    permission: PermissionName | null;
+    adminOnly?: boolean;
+  }[] = [
+    {
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: LayoutDashboardIcon,
+      permission: null,
+    },
+    {
+      name: "Deliveries",
+      path: "/deliveries",
+      icon: PackageCheck,
+      permission: "deliveries.view",
+    },
+    {
+      name: "Sowing",
+      path: "/sowing",
+      icon: Sprout,
+      permission: "sowing.view",
+    },
     {
       name: "Transport",
       path: "/sowing/tray-transport",
       icon: ArrowRightLeft,
+      permission: "sowing.view",
     },
-    { name: "Plant Stock", path: "/plant-stock", icon: Flower2 },
-    { name: "Stock", path: "/stock", icon: Warehouse },
-    { name: "Users", path: "/users", icon: Users },
+    {
+      name: "Plant Stock",
+      path: "/plant-stock",
+      icon: Flower2,
+      permission: "plant-stock.view",
+    },
+    {
+      name: "Crop Care",
+      path: "/crop-care",
+      icon: Droplets,
+      permission: "crop-care.view",
+    },
+    {
+      name: "Phytosanitary",
+      path: "/phytosanitary",
+      icon: FlaskConical,
+      permission: "phytosanitary.view",
+    },
+    {
+      // Which products this season may use, and what is left of each. Separate
+      // from Phytosanitary, which is the catalogue and the program: this screen
+      // is the per-season list and its stock.
+      name: "Agri-inputs",
+      path: "/agri-inputs",
+      icon: Beaker,
+      permission: "phytosanitary.view",
+    },
+    {
+      name: "Harvest",
+      path: "/harvest",
+      icon: Wheat,
+      permission: "harvest.view",
+    },
+    {
+      name: "Trucks",
+      path: "/trucks",
+      icon: Truck,
+      permission: "trucks.view",
+    },
+    {
+      name: "Stock",
+      path: "/stock",
+      icon: Warehouse,
+      permission: "stock.view",
+    },
+    {
+      name: "Users",
+      path: "/users",
+      icon: Users,
+      permission: "users.view",
+    },
+    {
+      name: "Season",
+      path: "/seasons",
+      icon: CalendarRange,
+      permission: null,
+      adminOnly: true,
+    },
   ];
 
   return (
@@ -60,22 +148,26 @@ function Sidebar() {
       </div>
 
       <div className="p-4 space-y-2 ">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              href={item.path}
-              key={item.name}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 
-              text-gray-700 dark:text-gray-100 hover:bg-indigo-50 hover:text-indigo-700 
+        {navItems
+          .filter(
+            (item) => can(item.permission) && (!item.adminOnly || isAdmin),
+          )
+          .map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                href={item.path}
+                key={item.name}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 
+              text-gray-700 dark:text-gray-100 hover:bg-green-50 hover:text-green-700 
               bg-gray-200 dark:bg-gray-700
               transition duration-200"
-            >
-              <Icon className="text-lg" />
-              <div className="text-lg">{item.name}</div>
-            </Link>
-          );
-        })}
+              >
+                <Icon className="text-lg" />
+                <div className="text-lg">{item.name}</div>
+              </Link>
+            );
+          })}
 
         <div className="flex text-2xl justify-start">
           <button

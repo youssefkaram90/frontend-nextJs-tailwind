@@ -21,25 +21,28 @@ const ssmEntrySchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.coerce.number().int().min(1).optional(),
   ),
+  remark: z.string().optional(),
 });
 
 // ── LPM entry: field / direct sowing ──
 const lpmEntrySchema = z.object({
   variety: z.string().min(1, "Variety is required"),
   stockType: z.enum(["BIO", "CVT"], { message: "Stock type is required" }),
-  lines: z.string().min(1, "Lines is required"),
+  lines: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.coerce.number().int().min(1, "Lines is required"),
+  ),
   metersPerLine: z.preprocess(
     (v) => (v === "" ? undefined : v),
     z.coerce.number().min(0, "Must be at least 0"),
   ),
-  seedsPerMeter: z.preprocess(
-    (v) => (v === "" ? undefined : v),
-    z.coerce.number().min(1, "Must be at least 1"),
-  ),
+  // Seeds to sow. Seeds/metre is DERIVED from this by the server — the planner
+  // never types a seed rate.
   plannedQuantity: z.preprocess(
     (v) => (v === "" ? undefined : v),
-    z.coerce.number().int().min(1).optional(),
+    z.coerce.number().int().min(1, "Seeds is required"),
   ),
+  remark: z.string().optional(),
 });
 
 // ── Full plan schemas per type ──

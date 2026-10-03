@@ -32,6 +32,7 @@ export default function EditDeliveryPage() {
     defaultValues: {
       deliveryCode: "",
       deliveryDate: new Date().toISOString().split("T")[0],
+      transport: "",
       lots: [
         {
           stockType: "CVT",
@@ -59,6 +60,7 @@ export default function EditDeliveryPage() {
     reset({
       deliveryCode: delivery.deliveryCode,
       deliveryDate: delivery.deliveryDate.split("T")[0],
+      transport: delivery.transport,
       lots: delivery.lots.map((lot) => ({
         stockType: lot.stockType as "BIO" | "CVT",
         lotNumber: lot.lotNumber,
@@ -80,6 +82,7 @@ export default function EditDeliveryPage() {
       const payload = {
         deliveryCode: data.deliveryCode,
         deliveryDate: data.deliveryDate,
+        transport: data.transport,
         lots: data.lots.map((lot) => ({
           stockType: lot.stockType as StockType,
           lotNumber: lot.lotNumber,
@@ -110,7 +113,7 @@ export default function EditDeliveryPage() {
   if (isPending) {
     return (
       <div className="p-4 flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -160,8 +163,8 @@ export default function EditDeliveryPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg 
-              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl
+              focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
               disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
           >
             {submitting ? "Saving..." : "Save Changes"}
@@ -189,9 +192,7 @@ export default function EditDeliveryPage() {
               <input
                 type="text"
                 {...register("deliveryCode")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               {errors.deliveryCode && (
                 <p className="mt-1 text-sm text-red-600">
@@ -208,13 +209,30 @@ export default function EditDeliveryPage() {
               <input
                 type="date"
                 {...register("deliveryDate")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               {errors.deliveryDate && (
                 <p className="mt-1 text-sm text-red-600">
                   {errors.deliveryDate.message}
+                </p>
+              )}
+            </div>
+
+            {/* Means of Transport */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Transport
+                <span className="text-red-400 font-normal"> *</span>
+              </label>
+              <input
+                type="text"
+                {...register("transport")}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Means Of Transport"
+              />
+              {errors.transport && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.transport.message}
                 </p>
               )}
             </div>
@@ -241,7 +259,7 @@ export default function EditDeliveryPage() {
                   remark: "",
                 })
               }
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
             >
               <Plus className="h-4 w-4" />
               Add Lot
@@ -281,9 +299,7 @@ export default function EditDeliveryPage() {
                   <input
                     type="text"
                     {...register(`lots.${index}.productName`)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="e.g. Tomato Roma"
                   />
                   {errors.lots?.[index]?.productName && (
@@ -301,9 +317,7 @@ export default function EditDeliveryPage() {
                   <input
                     type="text"
                     {...register(`lots.${index}.lotNumber`)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="e.g. L-2024-001"
                   />
                   {errors.lots?.[index]?.lotNumber && (
@@ -327,7 +341,7 @@ export default function EditDeliveryPage() {
                           type="radio"
                           value={type}
                           {...register(`lots.${index}.stockType`)}
-                          className="text-indigo-600 focus:ring-indigo-500"
+                          className="text-green-600 focus:ring-green-500"
                         />
                         <span className="text-sm text-gray-700 dark:text-gray-300">
                           {type}
@@ -350,9 +364,7 @@ export default function EditDeliveryPage() {
                   <input
                     type="number"
                     {...register(`lots.${index}.quantity`)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="0"
                   />
                   {errors.lots?.[index]?.quantity && (
@@ -369,9 +381,7 @@ export default function EditDeliveryPage() {
                   </label>
                   <select
                     {...register(`lots.${index}.productType`)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="SEEDS">Seeds</option>
                     <option value="PEAT">Peat</option>
@@ -391,9 +401,7 @@ export default function EditDeliveryPage() {
                   <input
                     type="text"
                     {...register(`lots.${index}.supplierName`)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Supplier"
                   />
                   {errors.lots?.[index]?.supplierName && (
@@ -416,9 +424,7 @@ export default function EditDeliveryPage() {
                     type="number"
                     step="any"
                     {...register(`lots.${index}.thousandSeedsPerGram`)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="e.g. 2.56"
                   />
                 </div>
@@ -435,9 +441,7 @@ export default function EditDeliveryPage() {
                   <input
                     type="text"
                     {...register(`lots.${index}.remark`)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Any notes"
                   />
                 </div>

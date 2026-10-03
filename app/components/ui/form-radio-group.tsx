@@ -28,7 +28,7 @@ export function FormRadioGroup({
               type="radio"
               value={option}
               {...radioProps}
-              className="text-indigo-600 focus:ring-indigo-500"
+              className="text-green-600 focus:ring-green-500"
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">
               {option}
@@ -36,7 +36,7 @@ export function FormRadioGroup({
           </label>
         ))}
       </div>
-      {error && <p className="mt-1 text-xs text-red-600">{error.message}</p>}
+      {error && <p className="mt-1 text-xs text-red-500">{error.message}</p>}
     </div>
   );
 }

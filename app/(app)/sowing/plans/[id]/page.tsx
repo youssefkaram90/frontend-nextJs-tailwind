@@ -6,7 +6,10 @@ import {
   useSowingPlan,
   useUpdatePlanStatus,
   useDeletePlanEntry,
+  useClosePlanEntry,
+  useReopenPlanEntry,
 } from "@/app/lib/hooks/use-sowing-plans";
+import { useCaps } from "@/app/lib/hooks/use-permissions";
 import type { SowingPlanEntry } from "@/app/lib/types/sowing";
 import { PlanStatus } from "@/app/lib/types/sowing";
 import {
@@ -16,6 +19,7 @@ import {
   Trash2,
   FileSpreadsheet,
   CheckCircle2,
+  RotateCcw,
   Loader2,
 } from "lucide-react";
 
@@ -27,6 +31,9 @@ export default function PlanDetailPage() {
   const { data: plan, isPending, error } = useSowingPlan(id);
   const updateStatus = useUpdatePlanStatus();
   const deleteEntry = useDeletePlanEntry();
+  const closeEntry = useClosePlanEntry();
+  const reopenEntry = useReopenPlanEntry();
+  const caps = useCaps("sowing");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
@@ -49,6 +56,44 @@ export default function PlanDetailPage() {
       await deleteEntry.mutateAsync(entryId);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete entry");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCloseEntry = async (entryId: string) => {
+    if (
+      !confirm(
+        "Close this entry without reaching the planned quantity? You can reopen it later if this was a mistake.",
+      )
+    )
+      return;
+    setActionLoading(`close-${entryId}`);
+    try {
+      await closeEntry.mutateAsync(entryId);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to close entry");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  /**
+   * Undo a manual close (SPLAN-12). Offers the way back that closing used to
+   * lack — the entry returns to whatever its sowings say it is.
+   */
+  const handleReopenEntry = async (entryId: string) => {
+    if (
+      !confirm(
+        "Reopen this entry? It goes back to what its sowings say it is, and it can be sown against again.",
+      )
+    )
+      return;
+    setActionLoading(`reopen-${entryId}`);
+    try {
+      await reopenEntry.mutateAsync(entryId);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reopen entry");
     } finally {
       setActionLoading(null);
     }
@@ -81,12 +126,18 @@ export default function PlanDetailPage() {
         "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200",
       EXECUTED:
         "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200",
+      CLOSED:
+        "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+    };
+    const labels: Record<string, string> = {
+      PARTIALLY_EXECUTED: "Partial",
+      CLOSED: "Closed",
     };
     return (
       <span
         className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || colors.PLANNED}`}
       >
-        {status === "PARTIALLY_EXECUTED" ? "Partial" : status}
+        {labels[status] ?? status}
       </span>
     );
   };
@@ -120,7 +171,7 @@ export default function PlanDetailPage() {
 
   // Multi-entry execution selection
   const pendingEntryIds = entries
-    .filter((e) => e.status !== "EXECUTED")
+    .filter((e) => !["EXECUTED", "CLOSED"].includes(e.status))
     .map((e) => e.id);
   const allPendingSelected =
     pendingEntryIds.length > 0 &&
@@ -146,7 +197,7 @@ export default function PlanDetailPage() {
       </button>
 
       {/* Plan Header */}
-      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg p-6">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-xl flex items-center justify-center">
@@ -170,7 +221,7 @@ export default function PlanDetailPage() {
 
           {/* Status Actions */}
           <div className="flex items-center gap-2">
-            {plan.status === PlanStatus.DRAFT && (
+            {caps.edit && plan.status === PlanStatus.DRAFT && (
               <button
                 onClick={() => handleStatusChange(PlanStatus.IN_PROGRESS)}
                 disabled={actionLoading === PlanStatus.IN_PROGRESS}
@@ -184,21 +235,22 @@ export default function PlanDetailPage() {
                 Start
               </button>
             )}
-            {(plan.status === PlanStatus.DRAFT ||
-              plan.status === PlanStatus.IN_PROGRESS) && (
-              <button
-                onClick={() => handleStatusChange(PlanStatus.COMPLETED)}
-                disabled={actionLoading === PlanStatus.COMPLETED}
-                className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-medium rounded-lg transition"
-              >
-                {actionLoading === PlanStatus.COMPLETED ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Complete
-              </button>
-            )}
+            {caps.edit &&
+              (plan.status === PlanStatus.DRAFT ||
+                plan.status === PlanStatus.IN_PROGRESS) && (
+                <button
+                  onClick={() => handleStatusChange(PlanStatus.COMPLETED)}
+                  disabled={actionLoading === PlanStatus.COMPLETED}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-medium rounded-lg transition"
+                >
+                  {actionLoading === PlanStatus.COMPLETED ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Complete
+                </button>
+              )}
           </div>
         </div>
 
@@ -215,12 +267,12 @@ export default function PlanDetailPage() {
       </div>
 
       {/* Entries Table */}
-      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Plan Entries
           </h2>
-          {pendingEntryIds.length > 0 && (
+          {caps.create && pendingEntryIds.length > 0 && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push(executeRoute(pendingEntryIds))}
@@ -372,17 +424,51 @@ export default function PlanDetailPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {entry.status !== "EXECUTED" && (
+                          {caps.create &&
+                            entry.status !== "EXECUTED" &&
+                            entry.status !== "CLOSED" && (
+                              <button
+                                onClick={() =>
+                                  router.push(
+                                    `/sowing/create?planId=${plan.id}&planEntryId=${entry.id}&type=${plan.planType}`,
+                                  )
+                                }
+                                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium"
+                              >
+                                <Play className="h-3 w-3" />
+                                Execute
+                              </button>
+                            )}
+                          {caps.edit &&
+                            entry.status !== "EXECUTED" &&
+                            entry.status !== "CLOSED" && (
+                              <button
+                                onClick={() => handleCloseEntry(entry.id)}
+                                disabled={actionLoading === `close-${entry.id}`}
+                                title="Close without reaching the planned quantity"
+                                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {actionLoading === `close-${entry.id}` ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-3 w-3" />
+                                )}
+                                Close
+                              </button>
+                            )}
+                          {caps.edit && entry.status === "CLOSED" && (
                             <button
-                              onClick={() =>
-                                router.push(
-                                  `/sowing/create?planId=${plan.id}&planEntryId=${entry.id}&type=${plan.planType}`,
-                                )
-                              }
-                              className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium"
+                              onClick={() => handleReopenEntry(entry.id)}
+                              disabled={actionLoading === `reopen-${entry.id}`}
+                              title="Reopen this entry so it can be sown against again"
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Play className="h-3 w-3" />
-                              Execute
+                              {actionLoading === `reopen-${entry.id}` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3 w-3" />
+                              )}
+                              Reopen
                             </button>
                           )}
                           {entry.status !== "PLANNED" &&
@@ -410,17 +496,19 @@ export default function PlanDetailPage() {
                                   : ""}
                               </button>
                             )}
-                          <button
-                            onClick={() => handleDeleteEntry(entry.id)}
-                            disabled={actionLoading === entry.id}
-                            className="text-red-400 hover:text-red-600 disabled:opacity-50"
-                          >
-                            {actionLoading === entry.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-3.5 w-3.5" />
-                            )}
-                          </button>
+                          {caps.delete && (
+                            <button
+                              onClick={() => handleDeleteEntry(entry.id)}
+                              disabled={actionLoading === entry.id}
+                              className="text-red-400 hover:text-red-600 disabled:opacity-50"
+                            >
+                              {actionLoading === entry.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

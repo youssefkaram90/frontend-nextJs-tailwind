@@ -36,14 +36,14 @@ export default function Signin() {
   }
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 
+      className="min-h-screen bg-gradient-to-br from-green-900 via-slate-900 
     to-gray-900 flex items-center justify-center px-4 py-8 "
     >
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6">
         <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
+          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
             <svg
-              className="w-8 h-8 text-indigo-600"
+              className="w-8 h-8 text-green-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -75,9 +75,9 @@ export default function Signin() {
               placeholder="Enter your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300
-                       text-gray-900 placeholder-gray-400
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500
                        transition duration-200"
             />
           </div>
@@ -95,9 +95,9 @@ export default function Signin() {
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300
-                       text-gray-900 placeholder-gray-400
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500
                        transition duration-200"
             />
           </div>
@@ -113,8 +113,8 @@ export default function Signin() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold 
-          rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+            className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold 
+          rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
           disabled:opacity-60 disabled:cursor-not-allowed transition duration-200 flex items-center justify-center gap-2"
           >
             {loading ? (

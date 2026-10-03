@@ -27,11 +27,9 @@ export function FormTextarea({
       <textarea
         {...registration}
         {...textareaProps}
-        className={`w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-          bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-          focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm ${className}`}
+        className={`w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 ${className}`}
       />
-      {error && <p className="mt-1 text-xs text-red-600">{error.message}</p>}
+      {error && <p className="mt-1 text-xs text-red-500">{error.message}</p>}
     </div>
   );
 }

@@ -75,8 +75,8 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg 
-              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl
+              focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
               disabled:opacity-60 disabled:cursor-not-allowed transition duration-200"
           >
             {submitting ? "Creating..." : "Create User"}
@@ -104,13 +104,11 @@ export default function SignupPage() {
               <input
                 type="text"
                 {...register("name")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="e.g. johndoe"
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-600">
+                <p className="mt-1 text-xs text-red-500">
                   {errors.name.message}
                 </p>
               )}
@@ -125,13 +123,11 @@ export default function SignupPage() {
               <input
                 type="text"
                 {...register("lastName")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="e.g. Doe"
               />
               {errors.lastName && (
-                <p className="mt-1 text-xs text-red-600">
+                <p className="mt-1 text-xs text-red-500">
                   {errors.lastName.message}
                 </p>
               )}
@@ -145,13 +141,11 @@ export default function SignupPage() {
               <input
                 type="password"
                 {...register("password")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="Min 6 characters"
               />
               {errors.password && (
-                <p className="mt-1 text-xs text-red-600">
+                <p className="mt-1 text-xs text-red-500">
                   {errors.password.message}
                 </p>
               )}
@@ -164,9 +158,7 @@ export default function SignupPage() {
               </label>
               <select
                 {...register("role")}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 {Object.values(UserRole).map((role) => (
                   <option key={role} value={role}>
@@ -175,7 +167,7 @@ export default function SignupPage() {
                 ))}
               </select>
               {errors.role && (
-                <p className="mt-1 text-xs text-red-600">
+                <p className="mt-1 text-xs text-red-500">
                   {errors.role.message}
                 </p>
               )}

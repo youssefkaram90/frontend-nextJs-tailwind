@@ -6,7 +6,7 @@ import { useStockSummary } from "@/app/lib/hooks/use-stock";
 import { useDeliveries } from "@/app/lib/hooks/use-deliveries";
 import { useSowingSSMs, useSowingLPMs } from "@/app/lib/hooks/use-sowing";
 import type { SowingSSM, SowingLPM } from "@/app/lib/types/sowing";
-import { Warehouse, Truck, Sprout, ArrowRight } from "lucide-react";
+import { Warehouse, Truck, Sprout, ArrowRight, Droplets } from "lucide-react";
 
 function formatPeat(value: number): string {
   return value.toFixed(2);
@@ -47,19 +47,19 @@ export default function Dashboard() {
 
       {isLoading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+          <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
         </div>
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link
               href="/stock"
               className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl hover:shadow-2xl transition-shadow block"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center">
-                  <Warehouse className="h-6 w-6 text-indigo-600" />
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-xl flex items-center justify-center">
+                  <Warehouse className="h-6 w-6 text-green-600" />
                 </div>
                 <div className="flex-1 space-y-1">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -124,6 +124,27 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Crop Care */}
+            <Link
+              href="/crop-care"
+              className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl hover:shadow-2xl transition-shadow block"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center">
+                  <Droplets className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Crop Care
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Irrigation & treatment
+                  </p>
+                  <p className="text-xs text-gray-400">Plans & operations</p>
+                </div>
+              </div>
+            </Link>
           </div>
 
           {/* Recent Deliveries */}
@@ -134,7 +155,7 @@ export default function Dashboard() {
               </h2>
               <Link
                 href="/deliveries"
-                className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 transition"
+                className="flex items-center gap-1 text-sm text-green-600 hover:text-green-700 transition"
               >
                 View all <ArrowRight className="h-3.5 w-3.5" />
               </Link>
@@ -204,7 +225,7 @@ export default function Dashboard() {
               </h2>
               <Link
                 href="/sowing"
-                className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 transition"
+                className="flex items-center gap-1 text-sm text-green-600 hover:text-green-700 transition"
               >
                 View all <ArrowRight className="h-3.5 w-3.5" />
               </Link>

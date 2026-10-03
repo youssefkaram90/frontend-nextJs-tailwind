@@ -2,12 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useDeliveries } from "@/app/lib/hooks/use-deliveries";
+import { useCaps } from "@/app/lib/hooks/use-permissions";
 import { Plus, Search } from "lucide-react";
 import { useSearch } from "@/app/lib/use-search";
 
 export default function DeliveriesPage() {
   const router = useRouter();
   const { query, setQuery, debouncedQuery } = useSearch();
+  const caps = useCaps("deliveries");
   const {
     data: deliveries = [],
     isPending,
@@ -18,7 +20,7 @@ export default function DeliveriesPage() {
     return (
       <div className="p-4">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+          <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
         </div>
       </div>
     );
@@ -46,14 +48,16 @@ export default function DeliveriesPage() {
             Track incoming stock deliveries
           </p>
         </div>
-        <button
-          onClick={() => router.push("/deliveries/create")}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg 
-            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-200"
-        >
-          <Plus className="h-4 w-4" />
-          New Delivery
-        </button>
+        {caps.create && (
+          <button
+            onClick={() => router.push("/deliveries/create")}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl 
+            focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200"
+          >
+            <Plus className="h-4 w-4" />
+            New Delivery
+          </button>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -64,7 +68,7 @@ export default function DeliveriesPage() {
           placeholder="Search deliveries by code, product, lot, supplier…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition text-sm"
         />
       </div>
 
@@ -88,6 +92,9 @@ export default function DeliveriesPage() {
                   <th className="px-6 py-3 text-left font-medium">Date</th>
                   <th className="px-6 py-3 text-left font-medium">
                     Delivery Code
+                  </th>
+                  <th className="px-6 py-3 text-right font-medium">
+                    Transport
                   </th>
                   <th className="px-6 py-3 text-right font-medium">Lots</th>
                   <th className="px-6 py-3 text-right font-medium">Seeds</th>
@@ -128,6 +135,12 @@ export default function DeliveriesPage() {
                       <td className="px-6 py-4">
                         <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300">
                           {delivery.deliveryCode}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {delivery.transport}
                         </span>
                       </td>
 

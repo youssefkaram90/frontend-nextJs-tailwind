@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useDelivery, useDeleteDelivery } from "@/app/lib/hooks/use-deliveries";
+import { useCaps } from "@/app/lib/hooks/use-permissions";
 import { ArrowLeft, Truck, Pencil, Trash2 } from "lucide-react";
 import { DetailCardSkeleton, TableSkeleton } from "@/app/components/skeleton";
 
@@ -11,6 +12,7 @@ export default function DeliveryDetailPage() {
   const router = useRouter();
   const { data: delivery, isPending, error } = useDelivery(id);
   const deleteDelivery = useDeleteDelivery();
+  const caps = useCaps("deliveries");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -39,7 +41,7 @@ export default function DeliveryDetailPage() {
     return (
       <div className="p-4">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error || "Delivery not found"}
+          {error.message || "Delivery not found"}
         </div>
       </div>
     );
@@ -86,14 +88,13 @@ export default function DeliveryDetailPage() {
             </p>
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
-                {error}
+                {error.message}
               </div>
             )}
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => {
                   setShowDeleteConfirm(false);
-                  setError(null);
                 }}
                 disabled={deleting}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition"
@@ -114,8 +115,8 @@ export default function DeliveryDetailPage() {
       {/* Delivery Header Card */}
       <div className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center">
-            <Truck className="h-7 w-7 text-indigo-600" />
+          <div className="w-14 h-14 bg-green-100 dark:bg-green-900/50 rounded-xl flex items-center justify-center">
+            <Truck className="h-7 w-7 text-green-600" />
           </div>
 
           <div className="flex-1">
@@ -155,27 +156,33 @@ export default function DeliveryDetailPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => router.push(`/deliveries/${id}/edit`)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 rounded-lg transition"
-          >
-            <Pencil className="h-4 w-4" />
-            Edit
-          </button>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-lg transition"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
-        </div>
+        {(caps.edit || caps.delete) && (
+          <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            {caps.edit && (
+              <button
+                onClick={() => router.push(`/deliveries/${id}/edit`)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/30 dark:hover:bg-green-900/50 rounded-lg transition"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </button>
+            )}
+            {caps.delete && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-lg transition"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {/* Error banner (non-critical) */}
       {error && !showDeleteConfirm && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {error}
+          {error.message}
         </div>
       )}
       {/* Lots Table */}
@@ -185,7 +192,9 @@ export default function DeliveryDetailPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Lots
             </h2>
-            <p className="text-right">Remark : {delivery.remark}</p>
+            <p className="text-right text-gray-900 dark:text-white">
+              Transport : {delivery.transport}
+            </p>
           </div>
         </div>
 

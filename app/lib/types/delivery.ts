@@ -27,7 +27,7 @@ export interface Delivery {
   id: string;
   deliveryDate: string;
   deliveryCode: string;
-  remark: string | null;
+  transport: string;
   createdAt: string;
   updatedAt: string;
   lots: DeliveryLot[];
@@ -46,6 +46,6 @@ export interface LotsDto {
 export interface CreateDeliveryDto {
   deliveryCode: string;
   deliveryDate: string;
-  remark?: string;
+  transport: string;
   lots: LotsDto[];
 }
