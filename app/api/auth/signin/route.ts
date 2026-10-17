@@ -1,46 +1,13 @@
 import { NextRequest } from "next/server";
-import { env } from "@/app/lib/env";
+import { relayBody } from "@/app/lib/backend-relay";
 
-const BACKEND_URL = env.BACKEND_URL;
-
+/**
+ * Sign in.
+ *
+ * The credentials go through untouched, and the backend's `Set-Cookie` headers
+ * MUST come back out: the session cookies belong to this origin, which is why the
+ * browser never calls the API directly.
+ */
 export async function POST(request: NextRequest) {
-  const BACKEND_TIMEOUT_MS = 10_000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
-
-  try {
-    const body = await request.json();
-    const response = await fetch(`${BACKEND_URL}/auth/signin`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    const allCookies = response.headers.getSetCookie();
-
-    const headers = new Headers();
-
-    for (const cookie of allCookies) {
-      headers.append("Set-Cookie", cookie);
-    }
-
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return new Response(
-        JSON.stringify({ message: "Backend request time out " }),
-        { status: 504, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return relayBody(request, "/auth/signin", "POST");
 }

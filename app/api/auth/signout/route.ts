@@ -1,42 +1,13 @@
 import { NextRequest } from "next/server";
-import { env } from "@/app/lib/env";
+import { relayBody } from "@/app/lib/backend-relay";
 
-const BACKEND_URL = env.BACKEND_URL;
-
+/**
+ * Sign out.
+ *
+ * The body is optional: the phone puts its refresh token there, the web sends
+ * the cookie. Either way the backend clears both cookies, so whatever it answers
+ * has to come back through the relay.
+ */
 export async function POST(request: NextRequest) {
-  const BACKEND_TIMEOUT_MS = 10_000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
-
-  try {
-    const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}/signout`, {
-      method: "POST",
-      headers: { Cookie: cookie },
-      signal: controller.signal,
-    });
-
-    const allCookies = response.headers.getSetCookie();
-
-    const headers = new Headers();
-
-    for (const cookie of allCookies) {
-      headers.append("Set-Cookie", cookie);
-    }
-
-    return new Response(JSON.stringify(null), {
-      status: response.status,
-      headers,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return new Response(
-        JSON.stringify({ error: "Backend request time out " }),
-        { status: 504, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return relayBody(request, "/auth/signout", "POST");
 }
