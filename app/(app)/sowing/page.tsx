@@ -46,19 +46,64 @@ export default function SowingsPage() {
 
   const [pendingGroups, setPendingGroups] = useState<PendingPlanGroup[]>([]);
   const [pendingLoading, setPendingLoading] = useState(true);
+  const [pendingError, setPendingError] = useState<string | null>(null);
   const [closingEntryId, setClosingEntryId] = useState<string | null>(null);
 
-  const loadPending = useCallback(() => {
+
+  const loadPending = useCallback(async () => {
     setPendingLoading(true);
-    getPendingPlanEntries()
-      .then(setPendingGroups)
-      .catch(() => setPendingGroups([]))
-      .finally(() => setPendingLoading(false));
+    setPendingError(null);
+
+    try {
+      const groups = await getPendingPlanEntries();
+      setPendingGroups(groups);
+    } catch (err) {
+      setPendingGroups([]);
+      setPendingError(
+        err instanceof Error
+          ? err.message
+          : "Could not load this list. Please try again.",
+      );
+    } finally {
+      setPendingLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    loadPending();
-  }, [loadPending]);
+    let cancelled = false;
+
+    async function fetchPending() {
+      setPendingLoading(true);
+      setPendingError(null);
+
+      try {
+        const groups = await getPendingPlanEntries();
+        if (!cancelled) {
+          setPendingGroups(groups);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPendingGroups([]);
+          setPendingError(
+            err instanceof Error
+              ? err.message
+              : "Could not load this list. Please try again.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setPendingLoading(false);
+        }
+      }
+    }
+
+    void fetchPending();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
 
   const handleCloseEntry = async (entryId: string) => {
     if (
@@ -191,6 +236,19 @@ export default function SowingsPage() {
       {pendingLoading ? (
         <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-8 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+        </div>
+      ) : pendingError ? (
+        <div className="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-5 py-4 text-sm text-red-700 dark:text-red-300">
+          <p className="font-semibold">
+            Could not load what is still to be sown.
+          </p>
+          <p className="mt-1">{pendingError}</p>
+          <button
+            onClick={loadPending}
+            className="mt-2 font-medium underline hover:no-underline"
+          >
+            Try again
+          </button>
         </div>
       ) : pendingGroups.length > 0 ? (
         <section className="space-y-4">

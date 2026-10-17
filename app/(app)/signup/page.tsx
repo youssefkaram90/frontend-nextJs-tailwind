@@ -5,14 +5,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createUser } from "@/app/lib/services/users";
+import { usePermissions } from "@/app/lib/hooks/use-permissions";
 import { UserRole } from "@/app/lib/types/user";
 import { ArrowLeft } from "lucide-react";
 import { signupSchema, type SignupFormData } from "@/app/schemas/auth.schema";
+import { collectValidationProblems } from "@/app/lib/validation-problems";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { isAdmin, isLoading: userLoading } = usePermissions();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [validationProblems, setValidationProblems] = useState<string[]>([]);
 
   const {
     register,
@@ -28,9 +32,20 @@ export default function SignupPage() {
     },
   });
 
+  /**
+   * A refused submit has to say so (X-03). `handleSubmit` had no invalid handler
+   * here, so clicking "Create User" with a field the rules reject did nothing at
+   * all — no message, no request, not even a spinner.
+   */
+  const onInvalid = (formErrors: unknown) => {
+    setValidationProblems(collectValidationProblems(formErrors));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   async function onSubmit(data: SignupFormData) {
     setSubmitting(true);
     setServerError(null);
+    setValidationProblems([]);
 
     try {
       await createUser({
@@ -49,6 +64,29 @@ export default function SignupPage() {
     }
   }
 
+  // Adding users is ADMIN-only on the server (`AdminOnlyGuard`), so a non-admin
+  // gets a plain message instead of a form whose submit is refused (P-4) — the
+  // same shape the seasons page uses.
+  if (!userLoading && !isAdmin) {
+    return (
+      <div className="p-4 space-y-6">
+        <button
+          onClick={() => router.push("/users")}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Users
+        </button>
+
+        <div className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Only an administrator can add users.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 space-y-6">
       {/* Back button */}
@@ -61,7 +99,7 @@ export default function SignupPage() {
       </button>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         {/* Page Header + Submit */}
         <div className="flex items-center justify-between">
           <div>
@@ -86,6 +124,19 @@ export default function SignupPage() {
         {serverError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
             {serverError}
+          </div>
+        )}
+
+        {validationProblems.length > 0 && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold">
+              Nothing was saved — some fields still need a value.
+            </p>
+            <ul className="mt-1.5 list-disc pl-5 space-y-0.5">
+              {validationProblems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
           </div>
         )}
 

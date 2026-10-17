@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/app/components/ui/page-header";
@@ -36,20 +36,22 @@ export default function EditShipmentPage() {
   const [shipmentDate, setShipmentDate] = useState("");
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [submitting, setSubmitting] = useState(false);
+  const [previousShipment, setPreviousShipment] =
+    useState<typeof shipment>(undefined);
 
-  useEffect(() => {
-    if (!shipment) return;
+  if (shipment && shipment !== previousShipment) {
+    setPreviousShipment(shipment);
     setShipmentNumber(shipment.shipmentNumber);
     setShipmentDate(shipment.shipmentDate.split("T")[0]);
     setLines(
       shipment.lines.length > 0
-        ? shipment.lines.map((l) => ({
-            harvestedProductId: l.harvestedProductId,
-            boxCount: String(l.boxCount),
+        ? shipment.lines.map((line) => ({
+            harvestedProductId: line.harvestedProductId,
+            boxCount: String(line.boxCount),
           }))
         : [emptyLine()],
     );
-  }, [shipment]);
+  }
 
   const inputClass =
     "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500";

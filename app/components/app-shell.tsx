@@ -4,6 +4,7 @@ import React from "react";
 import Header from "@/app/components/header";
 import Sidebar from "@/app/components/sidebar";
 import PermissionGate from "@/app/components/permission-gate";
+import SeasonAlignmentBanner from "@/app/components/season-alignment-banner";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 pl-64">
         <Header />
+        <SeasonAlignmentBanner />
         <PermissionGate>{children}</PermissionGate>
       </main>
     </div>

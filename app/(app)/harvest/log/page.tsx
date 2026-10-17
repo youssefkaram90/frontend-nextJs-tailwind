@@ -8,6 +8,7 @@ import { useToast } from "@/app/lib/toast-context";
 import { useCreateHarvestRecord } from "@/app/lib/hooks/use-harvest";
 import { usePlantStocks } from "@/app/lib/hooks/use-plant-stock";
 import { useTunnels, useSectors } from "@/app/lib/hooks/use-sowing";
+import { NOT_ASSIGNED_LOCATION } from "@/app/lib/sowing-constants";
 
 // Standard pack counts
 const PACK_CVT = 410;
@@ -64,7 +65,9 @@ export default function HarvestLogPage() {
   const batches = useMemo(
     () =>
       locationName
-        ? stocks.filter((s) => (s.location || "Not assigned") === locationName)
+        ? stocks.filter(
+            (s) => (s.location || NOT_ASSIGNED_LOCATION) === locationName,
+          )
         : [],
     [stocks, locationName],
   );
@@ -271,7 +274,7 @@ export default function HarvestLogPage() {
                 {b.variety} {b.code}· lot {b.lotNumber}
                 {b.remaining != null
                   ? ` · ${b.remaining.toLocaleString()} plants left`
-                  : ""}
+                  : " · not counted"}
               </option>
             ))}
           </select>
@@ -279,6 +282,12 @@ export default function HarvestLogPage() {
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {selectedBatch.remaining.toLocaleString()} plants still standing
               in this location.
+            </p>
+          )}
+          {selectedBatch && selectedBatch.remaining == null && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              This field has not been counted yet, so how many plants are
+              standing in it is not known.
             </p>
           )}
         </div>

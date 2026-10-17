@@ -5,15 +5,42 @@ import { useRouter } from "next/navigation";
 import { usePlantStocks } from "@/app/lib/hooks/use-plant-stock";
 import { useSearch } from "@/app/lib/use-search";
 import type { PlantStockRow } from "@/app/lib/types/plant-stock";
+import { NOT_ASSIGNED_LOCATION } from "@/app/lib/sowing-constants";
 import { Search, Sprout, Layers, ChevronRight } from "lucide-react";
 
 type StockType = "SSM" | "LPM";
+
+/**
+ * Is this a place you can open, or just a bucket?
+ *
+ * `Not assigned` holds the trays that have not been transported yet. It is a
+ * figure on the list (and a useful one), but there is nothing behind it: no
+ * tunnel, no counts to take — a sample is always taken in a tunnel. So the row
+ * is NOT a link (PSTOCK-23); before this it opened a page that could not find
+ * itself, because the address arrives percent-encoded ("Not%20assigned") and
+ * the detail page compared the raw text.
+ */
+function isPlace(location: string): boolean {
+  return location !== NOT_ASSIGNED_LOCATION;
+}
 
 interface VarietyRow {
   variety: string;
   initialStock: number;
   harvested: number;
-  lots: number;
+  /**
+   * The server's own `remaining`, added up (PSTOCK-17).
+   *
+   * The subtraction used to be done again here, which is how two places start
+   * disagreeing about one figure; the row already carries what is still standing.
+   */
+  remaining: number;
+  /**
+   * True when at least one row in this group has no `remaining` — a field that
+   * has not been counted (HARV-08). The figure is then shown as "—" instead of
+   * the sum of the rows that happen to have one, which would read as "0 left".
+   */
+  remainingUnknown: boolean;
 }
 
 interface LocationRow {
@@ -33,20 +60,33 @@ function groupByVariety(rows: PlantStockRow[]): VarietyRow[] {
         variety: r.variety,
         initialStock: 0,
         harvested: 0,
-        lots: 0,
+        remaining: 0,
+        remainingUnknown: false,
       } as VarietyRow);
     cur.initialStock += r.expectedPlants;
     cur.harvested += r.harvested ?? 0;
-    cur.lots += 1;
+    if (r.remaining == null) {
+      cur.remainingUnknown = true;
+    } else {
+      cur.remaining += r.remaining;
+    }
     map.set(r.variety, cur);
   }
   return [...map.values()].sort((a, b) => b.initialStock - a.initialStock);
 }
 
+/**
+ * One entry per location, in the order the SERVER sent the rows (PSTOCK-18).
+ *
+ * This used to sort by the digits inside the name — `T2` before `T10`, but also
+ * `Sector 2` before `Field 12`, which is a number pulled out of a word. The
+ * server now decides (tunnels by number, `Not assigned` first) and the phone
+ * agrees, because neither client sorts any more.
+ */
 function groupByLocation(rows: PlantStockRow[]): LocationRow[] {
   const map = new Map<string, LocationRow>();
   for (const r of rows) {
-    const loc = r.location || "Not assigned";
+    const loc = r.location || NOT_ASSIGNED_LOCATION;
     const cur =
       map.get(loc) ??
       ({
@@ -64,11 +104,7 @@ function groupByLocation(rows: PlantStockRow[]): LocationRow[] {
       : `${r.variety} ${r.code}`;
     map.set(loc, cur);
   }
-  return [...map.values()].sort((a, b) => {
-    const tunnelA = parseInt(a.location.replace(/\D/g, "")) || 0;
-    const tunnelB = parseInt(b.location.replace(/\D/g, "")) || 0;
-    return tunnelA - tunnelB;
-  });
+  return [...map.values()];
 }
 
 function thClass() {
@@ -104,8 +140,14 @@ export default function PlantStockPage() {
   const totals = useMemo(
     () => ({
       initialStock: rows.reduce((s, r) => s + r.expectedPlants, 0),
-      trays: rows.reduce((s, r) => s + (r.numberOfTrays ?? 0), 0),
-      sowings: rows.length,
+      // Trays STANDING IN A TUNNEL — `inTunnel`, not the batch's tray count.
+      // A batch of 2000 with 500 sent to a tunnel shows a 500 row AND a 1500 row
+      // for the trays still waiting (PSTOCK-22), and only the 500 are in a
+      // tunnel. `numberOfTrays` counted the waiting ones as if they were.
+      trays: rows.reduce((s, r) => s + (r.inTunnel ?? 0), 0),
+      // Distinct BATCHES, not rows: one batch split over two tunnels is already
+      // two rows, and with its waiting row it is three (PSTOCK-22).
+      sowings: new Set(rows.map((r) => r.id)).size,
     }),
     [rows],
   );
@@ -178,7 +220,7 @@ export default function PlantStockPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Initial stock (plants)
+            {isSSM ? "Initial stock (plants)" : "Seeds sown"}
           </p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
             {totals.initialStock.toLocaleString()}
@@ -216,7 +258,9 @@ export default function PlantStockPage() {
                 Per Variety
               </h2>
               <span className="text-xs text-gray-400 ml-auto">
-                Remain = Initial Stock − Harvested
+                {isSSM
+                  ? "Remain = Initial Stock − Harvested"
+                  : "Remain = plants counted − harvested (— until counted)"}
               </span>
             </div>
             <div className="overflow-x-auto">
@@ -224,14 +268,15 @@ export default function PlantStockPage() {
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300">
                     <th className={thClass()}>Variety</th>
-                    <th className={thClass()}>Initial Stock</th>
+                    <th className={thClass()}>
+                      {isSSM ? "Initial Stock" : "Seeds sown"}
+                    </th>
                     <th className={thClass()}>Harvested</th>
                     <th className={thClass()}>Remain</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {byVariety.map((v) => {
-                    const remain = v.initialStock - v.harvested;
                     return (
                       <tr
                         key={v.variety}
@@ -252,8 +297,13 @@ export default function PlantStockPage() {
                         </td>
                         <td
                           className={`${tdClass()} font-semibold text-green-600 dark:text-green-400`}
+                          title={
+                            v.remainingUnknown ? "Not counted yet" : undefined
+                          }
                         >
-                          {remain.toLocaleString()}
+                          {v.remainingUnknown
+                            ? "—"
+                            : v.remaining.toLocaleString()}
                         </td>
                       </tr>
                     );
@@ -278,7 +328,9 @@ export default function PlantStockPage() {
                     <th className={thClass()}>{isSSM ? "Tunnel" : "Sector"}</th>
                     {isSSM && <th className={thClass()}>Trays</th>}
                     <th className={thClass()}>Sowings</th>
-                    <th className={thClass()}>Initial Stock</th>
+                    <th className={thClass()}>
+                      {isSSM ? "Initial Stock" : "Seeds sown"}
+                    </th>
                     <th className={thClass()}>Varieties</th>
                   </tr>
                 </thead>
@@ -286,18 +338,37 @@ export default function PlantStockPage() {
                   {byLocation.map((loc) => (
                     <tr
                       key={loc.location}
-                      onClick={() =>
-                        router.push(
-                          `/plant-stock/${encodeURIComponent(loc.location)}`,
-                        )
+                      // The TYPE travels with the name (PSTOCK-20): the detail page
+                      // cannot tell a tunnel from a sector by the name alone.
+                      // `Not assigned` is not opened at all (PSTOCK-23).
+                      onClick={
+                        isPlace(loc.location)
+                          ? () =>
+                              router.push(
+                                `/plant-stock/${encodeURIComponent(loc.location)}?type=${activeType}`,
+                              )
+                          : undefined
                       }
-                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                      title={
+                        isPlace(loc.location)
+                          ? undefined
+                          : "Trays that have not been transported yet — there is no place to open behind this line."
+                      }
+                      className={
+                        isPlace(loc.location)
+                          ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                          : ""
+                      }
                     >
                       <td
                         className={`${tdClass()} font-medium text-gray-900 dark:text-white`}
                       >
                         <span className="inline-flex items-center gap-2">
-                          <ChevronRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          {isPlace(loc.location) ? (
+                            <ChevronRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <span className="w-4" />
+                          )}
                           {loc.location}
                         </span>
                       </td>

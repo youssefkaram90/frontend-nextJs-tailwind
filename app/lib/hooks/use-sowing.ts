@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   getTunnels,
   getSectors,
@@ -16,11 +21,15 @@ import {
 } from "@/app/lib/services/sowing";
 import { getStockItems } from "@/app/lib/services/stock";
 
-// ---- Lookup data ----
-export function useTunnels() {
+/**
+ * The tunnels of the open season. `q` is optional and forwarded as `?q=` — the
+ * capability exists on both clients so a search can be added without touching the
+ * hook again (TNL-6).
+ */
+export function useTunnels(q?: string) {
   return useQuery({
-    queryKey: ["tunnels"],
-    queryFn: () => getTunnels(),
+    queryKey: ["tunnels", { q }],
+    queryFn: () => getTunnels(q),
     staleTime: 5 * 60_000, // tunnels rarely change
   });
 }
@@ -46,6 +55,7 @@ export function useSowingPlans() {
     queryKey: ["sowing-plans"],
     queryFn: () => getSowingPlans(),
     staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -54,6 +64,7 @@ export function useSowingSSMs(q?: string) {
   return useQuery({
     queryKey: ["sowing", "ssm", q ?? ""],
     queryFn: () => getSowingSSMs(q || undefined),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -61,6 +72,7 @@ export function useSowingLPMs(q?: string) {
   return useQuery({
     queryKey: ["sowing", "lpm", q ?? ""],
     queryFn: () => getSowingLPMs(q || undefined),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -114,6 +126,9 @@ export function useUpdateSowingSSM() {
       updateSowingSSM(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sowing"] });
+      // An edit gives the old deduction back and takes the new one, so the stock
+      // figures are stale too, not just the sowing (SOW-19).
+      qc.invalidateQueries({ queryKey: ["stock"] });
     },
   });
 }
@@ -128,6 +143,9 @@ export function useUpdateSowingLPM() {
       updateSowingLPM(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sowing"] });
+      // Same as the SSM edit: the seed deduction is reversed and re-applied
+      // (SOW-19).
+      qc.invalidateQueries({ queryKey: ["stock"] });
     },
   });
 }
@@ -138,6 +156,8 @@ export function useDeleteSowingSSM() {
     mutationFn: deleteSowingSSM,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sowing"] });
+      // Deleting gives the seeds and the peat back (SOW-19).
+      qc.invalidateQueries({ queryKey: ["stock"] });
     },
   });
 }
@@ -148,6 +168,8 @@ export function useDeleteSowingLPM() {
     mutationFn: deleteSowingLPM,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sowing"] });
+      // Deleting gives the seeds back (SOW-19).
+      qc.invalidateQueries({ queryKey: ["stock"] });
     },
   });
 }

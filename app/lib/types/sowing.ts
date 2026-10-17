@@ -2,7 +2,7 @@
 // Sowing types — aligned with backend
 // ============================================================
 
-import { ProductType, StockType } from "./delivery";
+import {StockType } from "./delivery";
 
 // --- Enums ---
 
@@ -33,6 +33,13 @@ export interface Tunnel {
   location?: string | null;
   capacity: number;
   _count?: { ssmSowings: number };
+  /**
+   * Whether the tunnel can still be corrected — decided by the server (TNL-1).
+   *
+   * A tunnel is correctable only while nothing points at it: its number is copied
+   * onto the sowings recorded in it and into the plant stock's location.
+   */
+  canEdit?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,6 +99,17 @@ export interface SowingSSM {
   lotNumber: string;
   stockType: string;
   productType: string;
+  /**
+   * The peat pool this sowing took from — the lot and the stock type together,
+   * because that pair IS the pool's identity.
+   *
+   * The server has always required, stored and returned them, and they decide
+   * which pool a correction or a deletion moves peat in and out of — but this type
+   * never declared them, so no screen could show them and no form could correct
+   * them (SOW-12).
+   */
+  peatLotNumber: string;
+  peatStockType: string;
   numberOfTrays: number;
   seedsPerTray: number;
   quantityUsed: number;
@@ -163,6 +181,14 @@ export interface SowingPlanEntry {
   lines?: number | null;
   metersPerLine?: number | null;
   seedsPerMeter?: number | null;
+  /**
+   * The planner's own note about this line.
+   *
+   * The backend has always written and returned it, but the type never declared
+   * it, so no screen could read it back — which is why the correct-a-line form had
+   * nothing to prefill it with (SOW-08).
+   */
+  remark?: string | null;
   ssmSowings?: SowingSSM[];
   lpmSowings?: SowingLPM[];
   createdAt: string;
@@ -200,6 +226,15 @@ export interface ExecuteSSMDto {
   code?: number;
   lotNumber: string;
   stockType?: string;
+  /**
+   * The peat pool this sowing takes from — both halves of its key.
+   *
+   * Never sent before: all peat was one pool, so the server deducted from it
+   * whatever the form said. Peat is tracked per lot now (decided 2026-10-05),
+   * so the form picks the lot and the type travels with it.
+   */
+  peatLotNumber: string;
+  peatStockType: string;
   numberOfTrays: number;
   seedsPerTray?: number;
   sowingDate: Date;

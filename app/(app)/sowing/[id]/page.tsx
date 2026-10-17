@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { getSowingSSM, getSowingLPM } from "@/app/lib/services/sowing";
 import {
-  getSowingSSM,
-  getSowingLPM,
-  deleteSowingSSM,
-  deleteSowingLPM,
-} from "@/app/lib/services/sowing";
+  useDeleteSowingSSM,
+  useDeleteSowingLPM,
+} from "@/app/lib/hooks/use-sowing";
 import type { SowingSSM, SowingLPM } from "@/app/lib/types/sowing";
 import { ArrowLeft, Sprout, Pencil, Trash2, Layers } from "lucide-react";
 import { DetailCardSkeleton } from "@/app/components/skeleton";
@@ -19,6 +18,14 @@ export default function SowingDetailPage() {
   const type = searchParams.get("type") ?? "SSM";
   const router = useRouter();
   const caps = useCaps("sowing");
+
+  /**
+   * Deleting goes through the hooks, not the service functions (SOW-09): the hooks
+   * refresh the sowing list on the way back to it.
+   */
+  const deleteSSM = useDeleteSowingSSM();
+  const deleteLPM = useDeleteSowingLPM();
+
   const [sowing, setSowing] = useState<SowingSSM | SowingLPM | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +50,8 @@ export default function SowingDetailPage() {
   async function handleDelete() {
     setDeleting(true);
     try {
-      if (type === "SSM") await deleteSowingSSM(id);
-      else await deleteSowingLPM(id);
+      if (type === "SSM") await deleteSSM.mutateAsync(id);
+      else await deleteLPM.mutateAsync(id);
       router.push("/sowing");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete");
@@ -233,6 +240,32 @@ export default function SowingDetailPage() {
                 </p>
                 <p className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
                   {(sowing as SowingSSM).seedsPerTray}
+                </p>
+              </div>
+              {/**
+                The peat pool (SOW-12). It was recorded, deducted and returned all
+                along, but the type did not declare it, so the record could not
+                answer "which peat did this use?" without walking the PEAT lots'
+                movements.
+              */}
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Peat Lot
+                </p>
+                <p className="mt-1 text-base font-semibold text-gray-900 dark:text-white font-mono">
+                  {(sowing as SowingSSM).peatLotNumber}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Peat Type
+                </p>
+                <p className="mt-1">
+                  <span
+                    className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${(sowing as SowingSSM).peatStockType === "BIO" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}
+                  >
+                    {(sowing as SowingSSM).peatStockType}
+                  </span>
                 </p>
               </div>
             </>

@@ -99,16 +99,33 @@ export async function getOperations(params: {
   );
 }
 
-export async function createOperation(dto: {
+/**
+ * The body of a logged operation.
+ *
+ * One type for both jobs (CROP-14): logging one and correcting one send the same
+ * thing, because a correction is the whole operation written again rather than a
+ * patch of some of its fields.
+ */
+export type CropOperationInput = {
   operationType: "IRRIGATION" | "TREATMENT" | "FERTILISATION";
   productId?: string;
   quantity?: number;
   performedAt: string;
   notes?: string;
   locations: LocationTarget[];
-}) {
+};
+
+export async function createOperation(dto: CropOperationInput) {
   return api<CropOperation>("/api/crop-operations", {
     method: "POST",
+    body: JSON.stringify(dto),
+  });
+}
+
+/** Correct a logged operation (CROP-14). */
+export async function updateOperation(id: string, dto: CropOperationInput) {
+  return api<CropOperation>(`/api/crop-operations/${id}`, {
+    method: "PUT",
     body: JSON.stringify(dto),
   });
 }

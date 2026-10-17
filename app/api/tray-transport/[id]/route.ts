@@ -1,72 +1,36 @@
 import { NextRequest } from "next/server";
-import { env } from "@/app/lib/env";
+import { relayBody } from "@/app/lib/backend-relay";
 
-const BACKEND_URL = env.BACKEND_URL;
-const BACKEND_TIMEOUT_MS = 10_000;
-
-async function proxy(
-  request: NextRequest,
-  path: string,
-  init?: { method?: string; body?: string },
-) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
-  try {
-    const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}${path}`, {
-      method: init?.method ?? "GET",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: init?.body,
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-    const headers = new Headers();
-    for (const c of response.headers.getSetCookie())
-      headers.append("Set-Cookie", c);
-    headers.set("Content-Type", "application/json");
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return new Response(
-        JSON.stringify({ message: "Backend request timed out" }),
-        { status: 504, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  return proxy(request, `/tray-transport/${id}`);
-}
-
+/**
+ * PATCH /api/tray-transport/:id — correct how many trays went into one tunnel.
+ *
+ * Carries a body, so it uses `relayBody`: a request the backend refuses must come
+ * back with the backend's own sentence, not with "we could not reach the server"
+ * (the hand-copied version this replaces re-threw anything that was not a timeout,
+ * which reached the user as "Something went wrong. Please try again.").
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const body = await request.json();
-  return proxy(request, `/tray-transport/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
+  return relayBody(request, `/tray-transport/${id}`, "PATCH");
 }
+
+/**
+ * DELETE /api/tray-transport/:id — undo a tray move.
+ *
+ * A `GET` used to be exported here too, forwarding to `/tray-transport/{id}` —
+ * a path the backend does not serve (it has `GET /tray-transport`, `/pending`,
+ * `/sowing/:id` and `/tunnel/:id` only), so the backend answered 404. No client
+ * called it either: a single assignment is reached through its sowing or its
+ * tunnel. Dropped rather than re-written. (SOW-06 did the same for the equivalent
+ * dead `PATCH` on the plans relay.)
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return proxy(request, `/tray-transport/${id}`, {
-    method: "DELETE",
-  });
+  return relayBody(request, `/tray-transport/${id}`, "DELETE");
 }

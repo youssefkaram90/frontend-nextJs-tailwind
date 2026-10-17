@@ -8,26 +8,50 @@
  */
 export type PlantCountType = "TRAY" | "ROW_METRE";
 
+/**
+ * ONE reading: what the operator found in a single sample — one tray (SSM), or one
+ * metre of one row (LPM).
+ *
+ * The count's figures are calculated from these (PSTOCK-24), so a mistyped number
+ * is one reading to correct rather than a total to reverse-engineer.
+ */
+export interface PlantCountSample {
+  id: string;
+  plantCountId: string;
+  /** LPM only — the line it came from. Null for trays, which belong to no line. */
+  line: number | null;
+  /** plants found in this reading (follows from the gaps the operator counted) */
+  countedPlants: number;
+  /** gaps as entered for this reading; null when plants were counted directly */
+  missingPlants: number | null;
+  /** the order the readings were typed in */
+  position: number;
+  createdAt: string;
+}
+
 export interface PlantCount {
   id: string;
   plantStockId: string;
   countType: PlantCountType;
   /** tunnel number (SSM) or sector name (LPM) the sample came from */
   location: string | null;
-  /** LPM only — which line of the sowing was sampled */
+  /** LPM only — the line, when every reading shares one. Null for a session that
+   *  walked several lines, and for trays. */
   line: number | null;
-  /** LPM only — how many of the 7 rows were covered (1 sample per row minimum) */
+  /** LPM only — how many of the 7 rows were covered. Only counts recorded before
+   *  PSTOCK-24 carry this; a reading says which LINE it came from instead. */
   rowsInspected: number | null;
-  /** trays (SSM) or row-metres (LPM). LPM samples are always 1 metre, so this
-   *  is also the number of samples taken. */
+  /** how many readings were taken = `samples.length` */
   sampleSize: number;
-  /** plants present in the sample (derived from `missingPlants` when gaps were counted) */
+  /** plants in all of them together (derived from `missingPlants` when gaps were counted) */
   countedPlants: number;
   /** gaps as entered by the operator; null when plants were counted directly */
   missingPlants: number | null;
   density: number;
   estimatedPlants: number;
   germinationRate: number | null;
+  /** the readings themselves, oldest first */
+  samples?: PlantCountSample[];
   countDate: string;
   notes?: string | null;
   createdAt: string;
@@ -45,8 +69,19 @@ export interface CountSummary {
   germination: number | null;
   best: number | null;
   worst: number | null;
-  /** LPM only — one entry per line that has been counted */
-  lines: { line: number; countCount: number; germination: number }[];
+  /**
+   * LPM only — one entry per line that has been counted.
+   *
+   * `isBest` comes from the server (PSTOCK-19): which line holds the best figure
+   * is decided once, where the figures are worked out. This screen used to find
+   * it again with a `reduce`, beside a `best` that had been sent to it.
+   */
+  lines: {
+    line: number;
+    countCount: number;
+    germination: number;
+    isBest: boolean;
+  }[];
 }
 
 /**

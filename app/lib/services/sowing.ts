@@ -158,6 +158,17 @@ export async function getPlanEntries(
   return api<SowingPlanEntry[]>(`/api/sowing-plans/${planId}/entries`);
 }
 
+/**
+ * A planned date travels as `YYYY-MM-DD`.
+ *
+ * The backend DTO types it as a `Date`, but sending a full ISO timestamp makes
+ * the server parse it in *its* time zone, which can land the entry a day off.
+ * Both the add and the correct path need this, so it is written once.
+ */
+function asPlanDate(value: Date | string): string {
+  return value instanceof Date ? value.toLocaleDateString("en-CA") : value;
+}
+
 export async function addPlanEntry(
   planId: string,
   dto: CreatePlanEntryDto,
@@ -166,10 +177,31 @@ export async function addPlanEntry(
     method: "POST",
     body: JSON.stringify({
       ...dto,
-      plannedDate:
-        dto.plannedDate instanceof Date
-          ? dto.plannedDate.toLocaleDateString("en-CA")
-          : dto.plannedDate,
+      plannedDate: asPlanDate(dto.plannedDate),
+    }),
+  });
+}
+
+/**
+ * Correct a line that is already in a plan (SOW-08).
+ *
+ * **Not a partial patch.** The backend replaces the whole entry and re-derives
+ * its status and executed counters, so the caller must send every field its plan
+ * type needs — which is why the edit form is the same one that creates a line.
+ *
+ * This endpoint has existed (and been repaired) for a while with **no caller at
+ * all**: a plan line could be created, deleted, closed or reopened, but never
+ * corrected.
+ */
+export async function updatePlanEntry(
+  entryId: string,
+  dto: CreatePlanEntryDto,
+): Promise<SowingPlanEntry> {
+  return api<SowingPlanEntry>(`/api/sowing-plans/entries/${entryId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...dto,
+      plannedDate: asPlanDate(dto.plannedDate),
     }),
   });
 }

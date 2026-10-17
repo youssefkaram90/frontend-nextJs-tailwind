@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   addAgriInput,
   adjustAgriInput,
@@ -16,6 +21,7 @@ export function useAgriInputs(q?: string) {
   return useQuery({
     queryKey: ["agri-inputs", "list", q ?? ""],
     queryFn: () => getAgriInputs(q || undefined),
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -3,14 +3,17 @@
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { updateSowingSSM, updateSowingLPM } from "@/app/lib/services/sowing";
+import { useEffect, useMemo, useState } from "react";
 import {
   useTunnels,
   useSectors,
+  useStockItemsForSowing,
   useSowingSSM,
   useSowingLPM,
+  useUpdateSowingSSM,
+  useUpdateSowingLPM,
 } from "@/app/lib/hooks/use-sowing";
+import type { StockItem } from "@/app/lib/types/stock";
 import type {
   SowingSSM,
   SowingLPM,
@@ -24,7 +27,13 @@ import {
   DEFAULT_SEEDS_PER_TRAY,
 } from "@/app/schemas/sowing.schema";
 import { seedsPerRowMetre } from "@/app/lib/sowing-constants";
+import { collectValidationProblems } from "@/app/lib/validation-problems";
+import { useSettingValue } from "@/app/lib/hooks/use-settings";
 
+/**
+ * Correct a sowing that was already recorded — `?type=SSM` or `?type=LPM` decides
+ * which half of the form is shown.
+ */
 export default function EditSowingPage() {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -33,10 +42,23 @@ export default function EditSowingPage() {
   const isSSM = type === "SSM";
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [validationProblems, setValidationProblems] = useState<string[]>([]);
   const { data: tunnelData } = useTunnels();
   const tunnels = (tunnelData ?? []) as Tunnel[];
   const { data: sectorData } = useSectors();
   const sectors = (sectorData ?? []) as Sector[];
+  /**
+   * The season's peat lots, for the picker (SOW-12). Peat is tracked per lot, so
+   * the operator has to name the pool explicitly rather than a single "PEAT" row.
+   */
+  const { data: stockData } = useStockItemsForSowing();
+  const peatItems = useMemo(
+    () =>
+      ((stockData ?? []) as StockItem[]).filter(
+        (item) => item.productType === "PEAT",
+      ),
+    [stockData],
+  );
   const ssmQuery = useSowingSSM(isSSM ? id : "");
   const lpmQuery = useSowingLPM(!isSSM ? id : "");
   const sowingQuery = isSSM ? ssmQuery : lpmQuery;
@@ -45,6 +67,7 @@ export default function EditSowingPage() {
     register,
     handleSubmit,
     control,
+    setValue,
     reset,
     formState: { errors },
   } = useForm<EditSowingFormData>({
@@ -66,6 +89,26 @@ export default function EditSowingPage() {
     },
   });
 
+  /**
+   * The figure the farm uses now (SOW-11, phase 3). Shown as a hint, never sent
+   * unless the operator types one — an omitted figure keeps what this sowing
+   * already used.
+   */
+  const seedsPerTraySetting = useSettingValue(
+    "DEFAULT_SEEDS_PER_TRAY",
+    DEFAULT_SEEDS_PER_TRAY,
+  );
+
+  /**
+   * Saving goes through the hooks, not the service functions (SOW-09).
+   *
+   * The hooks are what invalidate the cache — the sowing list, the plans and the
+   * stock figures are held for 30 s to 2 minutes — so a save that skips them shows
+   * the operator the numbers from before their change.
+   */
+  const updateSSM = useUpdateSowingSSM();
+  const updateLPM = useUpdateSowingLPM();
+
   const numberOfTrays = useWatch({ control, name: "numberOfTrays" }) as
     | number
     | undefined;
@@ -74,7 +117,7 @@ export default function EditSowingPage() {
     | undefined;
   const calculatedTotal =
     isSSM && numberOfTrays && seedsPerTray
-      ? Number(numberOfTrays) * (Number(seedsPerTray) || DEFAULT_SEEDS_PER_TRAY)
+      ? Number(numberOfTrays) * (Number(seedsPerTray) || seedsPerTraySetting)
       : null;
 
   const nLines = useWatch({ control, name: "lines" }) as number | undefined;
@@ -111,30 +154,83 @@ export default function EditSowingPage() {
       quantityUsed: !isSSM ? sowing.quantityUsed : 0,
       lines: !isSSM ? ((sowing as SowingLPM).lines ?? 0) : 0,
       meterPerLine: !isSSM ? (sowing as SowingLPM).meterPerLine : 0,
+      /**
+       * The peat pool this sowing used (SOW-12). Prefilled, so saving without
+       * touching it keeps the same pool.
+       */
+      peatLotNumber: isSSM ? ((sowing as SowingSSM).peatLotNumber ?? "") : "",
+      peatStockType: isSSM
+        ? (((sowing as SowingSSM).peatStockType as "BIO" | "CVT") ?? "CVT")
+        : "CVT",
       tunnelId: isSSM ? (sowing as SowingSSM).tunnelId : "",
       sectorId: !isSSM ? (sowing as SowingLPM).sectorId : "",
     });
   }, [sowingQuery.data, reset, isSSM]);
 
+  /**
+   * A refused submit has to say so (X-03). "Save Changes" did nothing at all
+   * whenever a field the rules reject was left empty — no message, no request.
+   */
+  const onInvalid = (formErrors: unknown) => {
+    setValidationProblems(collectValidationProblems(formErrors));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   async function onSubmit(data: EditSowingFormData) {
     setSubmitting(true);
     setServerError(null);
+    setValidationProblems([]);
     try {
       if (isSSM) {
-        await updateSowingSSM(id, {
+        // The pool is required for SSM: "not sent" would silently mean "keep the
+        // old one", which is the opposite of what an edit form is for (SOW-12).
+        if (!data.peatLotNumber) {
+          setServerError("Choose the peat lot this sowing took from.");
+          setSubmitting(false);
+          return;
+        }
+
+        // Moving the pool moves stock in both directions — say so, and let the
+        // operator back out (SOW-12).
+        const previous = sowingQuery.data as SowingSSM | undefined;
+        const poolChanged =
+          previous &&
+          (previous.peatLotNumber !== data.peatLotNumber ||
+            previous.peatStockType !== data.peatStockType);
+        if (
+          poolChanged &&
+          !window.confirm(
+            `Move this sowing to peat lot ${data.peatLotNumber}` +
+              (data.peatStockType ? ` (${data.peatStockType})` : "") +
+              `?\n\nThe peat it used (${previous?.peatLotNumber}, ${previous?.peatStockType}) goes back to its own stock, and the new lot is deducted.`,
+          )
+        ) {
+          setSubmitting(false);
+          return;
+        }
+
+        await updateSSM.mutateAsync({
+          id,
           planId: data.planId,
           planEntryId: undefined,
           // `null` clears the tunnel; an omitted field would mean "keep" (SSM-08).
           tunnelId: data.tunnelId || null,
           variety: data.variety,
           lotNumber: data.lotNumber,
+          peatLotNumber: data.peatLotNumber,
+          peatStockType: data.peatStockType,
           numberOfTrays: Number(data.numberOfTrays ?? 0),
-          seedsPerTray: Number(data.seedsPerTray),
+          // Omitted when the field is empty: the server then keeps the figure this
+          // sowing already used, rather than the form inventing one (SOW-11).
+          ...(data.seedsPerTray
+            ? { seedsPerTray: Number(data.seedsPerTray) }
+            : {}),
           sowingDate: new Date(data.sowingDate),
           remarks: data.remarks,
         });
       } else {
-        await updateSowingLPM(id, {
+        await updateLPM.mutateAsync({
+          id,
           planId: data.planId,
           planEntryId: undefined,
           // `null` clears the sector; an omitted field would mean "keep" (SSM-08).
@@ -173,7 +269,7 @@ export default function EditSowingPage() {
       >
         <ArrowLeft className="h-4 w-4" /> Back to Sowing Record
       </button>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -194,6 +290,18 @@ export default function EditSowingPage() {
         {serverError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
             {serverError}
+          </div>
+        )}
+        {validationProblems.length > 0 && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold">
+              Nothing was saved — some fields still need a value.
+            </p>
+            <ul className="mt-1.5 list-disc pl-5 space-y-0.5">
+              {validationProblems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
           </div>
         )}
         <div className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-6">
@@ -278,6 +386,47 @@ export default function EditSowingPage() {
                     ))}
                   </select>
                 </div>
+                {/**
+                  The peat pool (SOW-12). Changing it moves stock: the old pool gets
+                  its peat back and the new one is deducted, so it is confirmed
+                  before saving rather than changed by a stray tap.
+                */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Peat Lot{" "}
+                    <span className="text-red-400 font-normal"> *</span>
+                  </label>
+                  <select
+                    {...register("peatLotNumber", {
+                      onChange: (e) => {
+                        const lotNumber = e.target.value;
+                        const lot = peatItems.find(
+                          (item) => item.lotNumber === lotNumber,
+                        );
+                        if (lot)
+                          setValue(
+                            "peatStockType",
+                            lot.stockType as "BIO" | "CVT",
+                          );
+                      },
+                    })}
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Select peat lot...</option>
+                    {peatItems.map((item) => (
+                      <option key={item.id} value={item.lotNumber}>
+                        {item.lotNumber} ({item.stockType})
+                      </option>
+                    ))}
+                  </select>
+                  {errors.peatLotNumber && (
+                    <p className="mt-1 text-xs text-red-600">
+                      Choose the peat lot this sowing took from.
+                    </p>
+                  )}
+                  {/** Travels with the picker — the pair is the pool's identity. */}
+                  <input type="hidden" {...register("peatStockType")} />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Number of Trays{" "}
@@ -304,11 +453,12 @@ export default function EditSowingPage() {
                     type="number"
                     {...register("seedsPerTray")}
                     className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder={`${DEFAULT_SEEDS_PER_TRAY}`}
+                    placeholder={`${seedsPerTraySetting}`}
                     min={1}
                   />
                   <p className="mt-1 text-xs text-gray-400">
-                    Default: {DEFAULT_SEEDS_PER_TRAY}
+                    Leave empty to keep the figure this sowing already has. The
+                    farm&apos;s current one is {seedsPerTraySetting}.
                   </p>
                 </div>
                 {calculatedTotal && (
@@ -324,7 +474,7 @@ export default function EditSowingPage() {
                         </p>
                         <p className="text-xs text-green-600 dark:text-green-400">
                           {numberOfTrays} trays ×{" "}
-                          {seedsPerTray ?? DEFAULT_SEEDS_PER_TRAY} seeds/tray
+                          {seedsPerTray ?? seedsPerTraySetting} seeds/tray
                         </p>
                       </div>
                     </div>

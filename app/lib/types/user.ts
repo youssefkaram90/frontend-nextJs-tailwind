@@ -21,11 +21,6 @@ export interface User {
   permissions?: string[];
 }
 
-export interface SigninDto {
-  name: string;
-  password: string;
-}
-
 export interface CreateUserDto {
   name: string;
   password: string;

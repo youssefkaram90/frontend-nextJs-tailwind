@@ -7,10 +7,12 @@ import {
   addPlanEntry,
   updatePlanStatus,
   deletePlanEntry,
+  updatePlanEntry,
   closePlanEntry,
   reopenPlanEntry,
   deleteSowingPlan,
 } from "@/app/lib/services/sowing";
+import type { CreatePlanEntryDto } from "@/app/lib/types/sowing";
 
 export function useSowingPlans(q?: string) {
   return useQuery({
@@ -45,6 +47,12 @@ export function useCreateSowingPlan() {
   });
 }
 
+/**
+ * Add one line to a plan that already exists (SOW-08).
+ *
+ * The service, the relay and the backend route all existed; nothing called the
+ * hook, so a plan's lines were fixed the moment the plan was created.
+ */
 export function useAddPlanEntry() {
   const qc = useQueryClient();
   return useMutation({
@@ -53,6 +61,29 @@ export function useAddPlanEntry() {
       ...dto
     }: { planId: string } & Parameters<typeof addPlanEntry>[1]) =>
       addPlanEntry(planId, dto),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["sowing-plans", vars.planId] });
+    },
+  });
+}
+
+/**
+ * Correct an existing line (SOW-08).
+ *
+ * `planId` is carried only so the open plan can be refreshed — the request
+ * itself addresses the entry by its own id.
+ */
+export function useUpdatePlanEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entryId,
+      dto,
+    }: {
+      planId: string;
+      entryId: string;
+      dto: CreatePlanEntryDto;
+    }) => updatePlanEntry(entryId, dto),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["sowing-plans", vars.planId] });
     },
@@ -74,7 +105,7 @@ export function useDeletePlanEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deletePlanEntry,
-    onSuccess: (_data, _vars, _ctx) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sowing-plans"] });
     },
   });

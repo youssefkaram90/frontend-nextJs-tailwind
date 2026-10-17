@@ -92,10 +92,10 @@ export default function UserDetailPage() {
     const map: Record<string, Record<string, Permission>> = {};
     for (const perm of allPermissions) {
       const parts = perm.name.split(".");
-      const module = parts[0] || "other";
+      const userModule = parts[0] || "other";
       const action = parts[1] || perm.name;
-      if (!map[module]) map[module] = {};
-      map[module][action] = perm;
+      if (!map[userModule]) map[userModule] = {};
+      map[userModule][action] = perm;
     }
     return map;
   }, [allPermissions]);

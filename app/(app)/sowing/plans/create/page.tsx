@@ -13,9 +13,13 @@ import { StockType } from "@/app/lib/types/delivery";
 import {
   createSowingPlanSchema,
   type PlanCreateFormInput,
-  type PlanEntryFormInput,
 } from "@/app/schemas/sowing-plan.schema";
-import { seedsPerRowMetre } from "@/app/lib/sowing-constants";
+import { DEFAULT_SEEDS_PER_TRAY } from "@/app/schemas/sowing.schema";
+import { useSettingValue } from "@/app/lib/hooks/use-settings";
+import {
+  PlanEntryFields,
+  PlanEntryRemarkField,
+} from "@/app/components/sowing/plan-entry-fields";
 import { Banner } from "@/app/components/ui/banner";
 import {
   ArrowLeft,
@@ -82,6 +86,16 @@ export default function CreatePlanPage() {
   const location = useWatch({ control, name: "location" });
   const isSSM = planType === "SSM";
 
+  /**
+   * The figure the farm uses now (SOW-11, phase 3) — the plan's seed forecast has
+   * to be worked out with the same number the sowing will use, or the two disagree
+   * the moment the figure changes.
+   */
+  const seedsPerTraySetting = useSettingValue(
+    "DEFAULT_SEEDS_PER_TRAY",
+    DEFAULT_SEEDS_PER_TRAY,
+  );
+
   // Derive sector display code: "Ha4-1" from "Hassan 4" + "Sector 1"
   const sectorCode = (() => {
     if (!location || !planName) return "";
@@ -119,18 +133,16 @@ export default function CreatePlanPage() {
     try {
       if (tab === "manual") {
         const cleanEntries = data.entries.map((e) => {
-          // Auto-calculate plannedQuantity:
-          // SSM: Trays × 285 seeds. LPM: the planner enters the seeds directly.
+          // SSM: Trays × the farm's seeds-per-tray figure.
+          // LPM: NO seed total — a field line is planned by its density, and the
+          // server works the total out from the lines, the metres per line and the
+          // farm's own figure (user, 2026-10-11).
           let plannedQuantity: number | undefined;
 
           if (isSSM) {
             const trays = e.plannedTrays != null ? Number(e.plannedTrays) : 0;
-            plannedQuantity = trays > 0 ? Math.round(trays * 285) : undefined;
-          } else {
-            // LPM: the planner enters the seed quantity. Seeds/metre is derived
-            // from it server-side and shown back as a preview.
             plannedQuantity =
-              e.plannedQuantity != null ? Number(e.plannedQuantity) : undefined;
+              trays > 0 ? Math.round(trays * seedsPerTraySetting) : undefined;
           }
 
           return {
@@ -423,236 +435,21 @@ export default function CreatePlanPage() {
                   </div>
 
                   {isOpen && (
-                    <>
-                      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
-                        {/** Variety */}
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-0.5">
-                            Variety{" "}
-                            <span className="text-red-400 font-normal"> *</span>
-                          </label>
-                          <input
-                            type="text"
-                            {...register(`entries.${idx}.variety`)}
-                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                            placeholder="Variety name"
-                          />
-                          {errors.entries?.[idx]?.variety && (
-                            <p className="mt-1 text-xs text-red-600">
-                              {errors.entries[idx]?.variety?.message}
-                            </p>
-                          )}
-                        </div>
-
-                        {/** CStock Type */}
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-0.5">
-                            Stock Type{" "}
-                            <span className="text-red-400 font-normal"> *</span>
-                          </label>
-                          <select
-                            {...register(`entries.${idx}.stockType`)}
-                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                          >
-                            <option value="BIO">BIO</option>
-                            <option value="CVT">CVT</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* SSM-specific */}
-                      {isSSM && (
-                        <>
-                          <div className="grid grid-cols-2 gap-3">
-                            {/**Planned trayes */}
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-0.5">
-                                Planned Trays{" "}
-                                <span className="text-red-400 font-normal">
-                                  {" "}
-                                  *
-                                </span>
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                {...register(`entries.${idx}.plannedTrays`)}
-                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder="e.g. 1 000"
-                              />
-                              {errors.entries?.[idx]?.plannedTrays && (
-                                <p className="mt-1 text-xs text-red-600">
-                                  {errors.entries[idx]?.plannedTrays?.message}
-                                </p>
-                              )}
-                            </div>
-
-                            {/**peat used */}
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-0.5">
-                                Peat{" "}
-                                <span className="text-red-400 font-normal">
-                                  {" "}
-                                  *
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                {...register(`entries.${idx}.peat`)}
-                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder='e.g. "50% CVT 50% BIO"'
-                              />
-                            </div>
-                          </div>
-
-                          {/* Computed Seeds Total (SSM: Trays × 285) */}
-                          {(() => {
-                            const trays =
-                              watchedEntries?.[idx]?.plannedTrays != null
-                                ? Number(watchedEntries[idx].plannedTrays)
-                                : 0;
-                            const total = trays * 285;
-                            return (
-                              <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-2">
-                                <span className="text-xs text-green-600 dark:text-green-400">
-                                  Seeds Total {`Trays(${trays}) * 285`}
-                                </span>
-                                <p className="text-sm font-bold text-green-700 dark:text-green-300">
-                                  {total > 0
-                                    ? total.toLocaleString("fr-FR")
-                                    : "0"}
-                                </p>
-                              </div>
-                            );
-                          })()}
-                        </>
-                      )}
-
-                      {/* LPM-specific */}
-                      {!isSSM && (
-                        <>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {/** Lines Count */}
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-0.5">
-                                Lines{" "}
-                                <span className="text-red-400 font-normal">
-                                  {" "}
-                                  *
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                {...register(`entries.${idx}.lines`)}
-                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder="e.g. 2 or 2.5"
-                              />
-                              {errors.entries?.[idx]?.lines && (
-                                <p className="mt-1 text-xs text-red-600">
-                                  {errors.entries[idx]?.lines?.message}
-                                </p>
-                              )}
-                            </div>
-
-                            {/**Lines lenght */}
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-0.5">
-                                Meters/Line{" "}
-                                <span className="text-red-400 font-normal">
-                                  {" "}
-                                  *
-                                </span>
-                              </label>
-                              <input
-                                type="number"
-                                {...register(`entries.${idx}.metersPerLine`)}
-                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder="e.g. 120"
-                              />
-                              {errors.entries?.[idx]?.metersPerLine && (
-                                <p className="mt-1 text-xs text-red-600">
-                                  {errors.entries[idx]?.metersPerLine?.message}
-                                </p>
-                              )}
-                            </div>
-
-                            {/**Seeds to sow */}
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-0.5">
-                                Seeds{" "}
-                                <span className="text-red-400 font-normal">
-                                  {" "}
-                                  *
-                                </span>
-                              </label>
-                              <input
-                                type="number"
-                                {...register(`entries.${idx}.plannedQuantity`)}
-                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder="e.g. 50000"
-                              />
-                              {errors.entries?.[idx]?.plannedQuantity && (
-                                <p className="mt-1 text-xs text-red-600">
-                                  {
-                                    errors.entries[idx]?.plannedQuantity
-                                      ?.message
-                                  }
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Derived Seeds/Meter: seeds ÷ (lines × M/L × rows per line) */}
-                          {(() => {
-                            const linesNum =
-                              Number(watchedEntries?.[idx]?.lines) || 0;
-                            const mpl =
-                              watchedEntries?.[idx]?.metersPerLine != null
-                                ? Number(watchedEntries[idx].metersPerLine)
-                                : 0;
-                            const seeds =
-                              watchedEntries?.[idx]?.plannedQuantity != null
-                                ? Number(watchedEntries[idx].plannedQuantity)
-                                : 0;
-                            const spm = seedsPerRowMetre(seeds, linesNum, mpl);
-                            return (
-                              <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-2">
-                                <span className="text-xs text-green-600 dark:text-green-400">
-                                  Seeds/Meter (auto)
-                                </span>
-                                <p className="text-sm font-bold text-green-700 dark:text-green-300">
-                                  {spm > 0 ? spm.toLocaleString("fr-FR") : "0"}
-                                </p>
-                              </div>
-                            );
-                          })()}
-                        </>
-                      )}
-                    </>
+                    <PlanEntryFields
+                      register={register}
+                      errors={errors.entries?.[idx]}
+                      namePrefix={`entries.${idx}.`}
+                      values={watchedEntries?.[idx]}
+                      isSSM={isSSM}
+                    />
                   )}
                   {/**Remark for each Row */}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">
-                        Remark{" "}
-                        <span className="text-gray-400 font-normal">
-                          (Optional)
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        {...register(`entries.${idx}.remark`)}
-                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        placeholder="Mark your notes"
-                      />
-                      {errors.entries?.[idx]?.remark && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors.entries[idx]?.remark?.message}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <PlanEntryRemarkField
+                    register={register}
+                    errors={errors.entries?.[idx]}
+                    namePrefix={`entries.${idx}.`}
+                  />
                 </div>
               );
             })}
@@ -705,9 +502,14 @@ export default function CreatePlanPage() {
                 </p>
                 <code className="text-xs text-gray-500 dark:text-gray-400">
                   {isSSM
-                    ? "variety, stockType, plannedTrays, peat"
-                    : "variety, stockType, lines, metersPerLine, seedsPerMeter, sectorName, location"}
+                    ? "variety, stockType, plannedDate, plannedTrays, peat"
+                    : "variety, stockType, plannedDate, sectorName, lines, metersPerLine, plannedQuantity"}
                 </code>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  {isSSM
+                    ? ""
+                    : "The imported sheet still carries a plannedQuantity column. A plan typed in on screen does not: it works the seed out from the density in Settings."}
+                </p>
               </div>
             </div>
           </div>

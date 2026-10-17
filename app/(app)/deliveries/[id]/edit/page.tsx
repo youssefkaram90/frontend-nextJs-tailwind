@@ -13,6 +13,7 @@ import {
   editDeliverySchema,
   type EditDeliveryFormData,
 } from "@/app/schemas/delivery.schema";
+import { collectValidationProblems } from "@/app/lib/validation-problems";
 
 export default function EditDeliveryPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,7 @@ export default function EditDeliveryPage() {
   const { data: delivery, isPending, error: loadError } = useDelivery(id);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [validationProblems, setValidationProblems] = useState<string[]>([]);
 
   const {
     register,
@@ -74,9 +76,19 @@ export default function EditDeliveryPage() {
     });
   }, [delivery, reset]);
 
+  /**
+   * A refused submit has to say so (X-03). "Save Changes" did nothing at all
+   * whenever a lot was missing a required field — no message, no request.
+   */
+  const onInvalid = (formErrors: unknown) => {
+    setValidationProblems(collectValidationProblems(formErrors));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   async function onSubmit(data: EditDeliveryFormData) {
     setSubmitting(true);
     setServerError(null);
+    setValidationProblems([]);
 
     try {
       const payload = {
@@ -149,7 +161,7 @@ export default function EditDeliveryPage() {
       </button>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         {/* Page Header + Submit */}
         <div className="flex items-center justify-between">
           <div>
@@ -174,6 +186,19 @@ export default function EditDeliveryPage() {
         {serverError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
             {serverError}
+          </div>
+        )}
+
+        {validationProblems.length > 0 && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold">
+              Nothing was saved — some fields still need a value.
+            </p>
+            <ul className="mt-1.5 list-disc pl-5 space-y-0.5">
+              {validationProblems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
           </div>
         )}
 

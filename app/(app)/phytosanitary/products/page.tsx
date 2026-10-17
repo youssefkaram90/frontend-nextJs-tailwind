@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   FlaskConical,
-  Plus,
   Pencil,
   Trash2,
   Search,
@@ -41,7 +39,6 @@ const emptyForm = {
 };
 
 export default function ProductsPage() {
-  const router = useRouter();
   const { showToast } = useToast();
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -131,8 +128,8 @@ export default function ProductsPage() {
       <PageHeader
         title="Phytosanitary Products"
         description="Catalog of crop protection products"
-        backTo="/phytosanitary"
-        backLabel="Back to Phytosanitary"
+        backTo="/crop-care"
+        backLabel="Back to Crop Care"
       />
 
       {/* Create / edit form */}

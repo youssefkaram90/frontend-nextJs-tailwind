@@ -5,12 +5,20 @@ import { useRouter, useParams } from "next/navigation";
 import {
   useSowingPlan,
   useUpdatePlanStatus,
+  useAddPlanEntry,
+  useUpdatePlanEntry,
   useDeletePlanEntry,
   useClosePlanEntry,
   useReopenPlanEntry,
 } from "@/app/lib/hooks/use-sowing-plans";
 import { useCaps } from "@/app/lib/hooks/use-permissions";
-import type { SowingPlanEntry } from "@/app/lib/types/sowing";
+import { PlanEntryForm } from "@/app/components/sowing/plan-entry-form";
+import type {
+  CreatePlanEntryDto,
+  SowingLPM,
+  SowingPlanEntry,
+  SowingSSM,
+} from "@/app/lib/types/sowing";
 import { PlanStatus } from "@/app/lib/types/sowing";
 import {
   ArrowLeft,
@@ -21,6 +29,9 @@ import {
   CheckCircle2,
   RotateCcw,
   Loader2,
+  Plus,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
 
 export default function PlanDetailPage() {
@@ -30,6 +41,8 @@ export default function PlanDetailPage() {
 
   const { data: plan, isPending, error } = useSowingPlan(id);
   const updateStatus = useUpdatePlanStatus();
+  const addEntry = useAddPlanEntry();
+  const updateEntry = useUpdatePlanEntry();
   const deleteEntry = useDeletePlanEntry();
   const closeEntry = useClosePlanEntry();
   const reopenEntry = useReopenPlanEntry();
@@ -37,6 +50,58 @@ export default function PlanDetailPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
+
+  // "Add a line" is the collapsible section; it doubles as its open/closed state,
+  // so Cancel closes it as well as clearing the form.
+  const [addingLine, setAddingLine] = useState(false);
+  /** The line being corrected — the form itself is the same one that adds. */
+  const [editingEntry, setEditingEntry] = useState<SowingPlanEntry | null>(
+    null,
+  );
+  const [savingLine, setSavingLine] = useState(false);
+
+  /**
+   * Add one line to a plan that is already running (SOW-08).
+   *
+   * Nothing offered this before: the service function, the relay and the backend
+   * route all existed and were simply never called, so a plan's lines were frozen
+   * the moment the plan was created.
+   */
+  const handleAddLine = async (dto: CreatePlanEntryDto) => {
+    setSavingLine(true);
+    try {
+      await addEntry.mutateAsync({ planId: id, ...dto });
+      setAddingLine(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to add the line");
+    } finally {
+      setSavingLine(false);
+    }
+  };
+
+  /**
+   * Correct an existing line (SOW-08).
+   *
+   * The backend **replaces** the entry and re-derives its status and executed
+   * counters, so the form sends every field — a partial patch would quietly wipe
+   * whatever it left out.
+   */
+  const handleSaveLine = async (dto: CreatePlanEntryDto) => {
+    if (!editingEntry) return;
+    setSavingLine(true);
+    try {
+      await updateEntry.mutateAsync({
+        planId: id,
+        entryId: editingEntry.id,
+        dto,
+      });
+      setEditingEntry(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save the line");
+    } finally {
+      setSavingLine(false);
+    }
+  };
 
   const handleStatusChange = async (status: PlanStatus) => {
     setActionLoading(status);
@@ -181,7 +246,7 @@ export default function PlanDetailPage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   const toggleAllSelection = () =>
-    setSelectedEntryIds((prev) => (allPendingSelected ? [] : pendingEntryIds));
+    setSelectedEntryIds(allPendingSelected ? [] : pendingEntryIds);
   const executeRoute = (ids: string[]) =>
     `/sowing/create?planId=${plan.id}&planEntryIds=${ids.join(",")}`;
 
@@ -294,6 +359,62 @@ export default function PlanDetailPage() {
             </div>
           )}
         </div>
+
+        {/*
+          Add a line (SOW-08). Collapsible, and the same editor the create-plan
+          form uses, so a line added later cannot obey different rules from one
+          created with the plan.
+        */}
+        {caps.create && (
+          <details
+            open={addingLine}
+            onToggle={(event) =>
+              setAddingLine((event.target as HTMLDetailsElement).open)
+            }
+            className="group border-b border-gray-200 dark:border-gray-700"
+          >
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-6 py-3 text-sm font-medium text-green-600 hover:text-green-700 [&::-webkit-details-marker]:hidden">
+              <Plus className="h-4 w-4" />
+              Add a line
+              <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="px-6 pb-5 pt-1">
+              <PlanEntryForm
+                planType={plan.planType as "SSM" | "LPM"}
+                submitting={savingLine}
+                onSubmit={handleAddLine}
+                onCancel={() => setAddingLine(false)}
+              />
+            </div>
+          </details>
+        )}
+
+        {/* Correcting a line opens the same editor over the table. */}
+        {editingEntry && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setEditingEntry(null)}
+            />
+            <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+              <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+                Correct line{" "}
+                {entries.findIndex((e) => e.id === editingEntry.id) + 1} —{" "}
+                {editingEntry.variety}
+              </h3>
+              <PlanEntryForm
+                planType={plan.planType as "SSM" | "LPM"}
+                entry={editingEntry}
+                position={
+                  entries.findIndex((e) => e.id === editingEntry.id) + 1
+                }
+                submitting={savingLine}
+                onSubmit={handleSaveLine}
+                onCancel={() => setEditingEntry(null)}
+              />
+            </div>
+          </div>
+        )}
 
         {entries.length === 0 ? (
           <div className="p-8 text-center text-gray-400">
@@ -439,6 +560,25 @@ export default function PlanDetailPage() {
                                 Execute
                               </button>
                             )}
+                          {/**
+                            Correcting a line is offered while the line is still
+                            work in progress. A manually CLOSED line has Reopen
+                            right beside it, and an EXECUTED one is frozen by the
+                            backend (`updateEntry` refuses it), so offering Edit
+                            there would only produce a rejection.
+                          */}
+                          {caps.edit &&
+                            (entry.status === "PLANNED" ||
+                              entry.status === "PARTIALLY_EXECUTED") && (
+                              <button
+                                onClick={() => setEditingEntry(entry)}
+                                title="Correct this line"
+                                className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white font-medium"
+                              >
+                                <Pencil className="h-3 w-3" />
+                                Edit
+                              </button>
+                            )}
                           {caps.edit &&
                             entry.status !== "EXECUTED" &&
                             entry.status !== "CLOSED" && (
@@ -520,7 +660,7 @@ export default function PlanDetailPage() {
                         <td colSpan={isSSM ? 7 : 10} className="px-4 py-2">
                           <div className="space-y-1.5">
                             {(entry.ssmSowings ?? entry.lpmSowings ?? []).map(
-                              (sowing: any) => {
+                              (sowing) => {
                                 const sowingDate = new Date(
                                   sowing.sowingDate,
                                 ).toLocaleDateString("en-GB", {
@@ -533,14 +673,15 @@ export default function PlanDetailPage() {
                                 );
                                 const location = isSSM
                                   ? (() => {
-                                      const tunnels = sowing.tunnelAssignments
-                                        ?.map((a: any) => a.tunnel?.number)
+                                    const ssmSowing = sowing as SowingSSM;
+                                      const tunnels = ssmSowing.tunnelAssignments 
+                                        ?.map((a) => a.tunnel?.number)
                                         .filter(Boolean);
                                       return tunnels?.length
                                         ? `Tunnels ${tunnels.join(", ")}`
-                                        : `Tunnel ${sowing.tunnel?.number ?? "—"}`;
+                                        : `Tunnel ${ssmSowing.tunnel?.number ?? "—"}`;
                                     })()
-                                  : `Sector ${sowing.sector?.name ?? "—"}`;
+                                  : `Sector ${(sowing as SowingLPM).sector?.name ?? "—"}`;
                                 return (
                                   <button
                                     key={sowing.id}
@@ -558,9 +699,9 @@ export default function PlanDetailPage() {
                                     <span className="text-xs text-gray-400">
                                       · {location}
                                     </span>
-                                    {isSSM && sowing.numberOfTrays && (
+                                    {isSSM && (sowing as SowingSSM).numberOfTrays && (
                                       <span className="text-xs text-gray-400">
-                                        · {sowing.numberOfTrays} trays
+                                        · {(sowing as SowingSSM).numberOfTrays} trays
                                       </span>
                                     )}
                                     <span className="text-xs font-medium text-blue-600 ml-auto">

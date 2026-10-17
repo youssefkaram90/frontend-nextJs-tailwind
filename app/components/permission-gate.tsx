@@ -22,13 +22,23 @@ export const ROUTE_PERMISSIONS: {
   { prefix: "/plant-stock", permission: "plant-stock.view" },
   { prefix: "/crop-care", permission: "crop-care.view" },
   { prefix: "/phytosanitary", permission: "phytosanitary.view" },
+  // Agri-inputs is the phyto catalogue's shelf rather than a module of its own:
+  // its routes ride `phytosanitary.*` and the sidebar hides it under the same
+  // permission. Without this line the gate read "no match" as "no permission
+  // needed" and let the page through (P-3).
+  { prefix: "/agri-inputs", permission: "phytosanitary.view" },
   { prefix: "/harvest", permission: "harvest.view" },
-  // More specific first: shipments live inside the trucks section but are
-  // gated separately, so /trucks/shipments must match before /trucks.
-  { prefix: "/trucks/shipments", permission: "shipments.view" },
+  // The whole /trucks section — the fleet AND the shipment screens nested under
+  // it — rides one permission (decided 2026-10-13). The `/trucks/shipments`
+  // entry that used to sit here never matched anything anyway: the routes are
+  // `/trucks/<id>/shipments/...`, so it fell through to `/trucks` regardless.
   { prefix: "/trucks", permission: "trucks.view" },
   { prefix: "/stock", permission: "stock.view" },
   { prefix: "/users", permission: "users.view" },
+  // Settings is ADMIN-only and the page says so itself, the same shape as `/signup`:
+  // `null` here is the deliberate "anyone signed in may open it", not an accidental
+  // no-match (P-3). The server refuses a non-admin's save with `AdminOnlyGuard`.
+  { prefix: "/settings", permission: null },
 ];
 
 export function requiredPermissionFor(pathname: string): PermissionName | null {

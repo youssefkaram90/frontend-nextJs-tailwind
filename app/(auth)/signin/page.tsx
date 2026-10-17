@@ -4,6 +4,31 @@ import { signin } from "@/app/lib/auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+/**
+ * Where to send the user after a successful sign-in.
+ *
+ * Two callers already put the destination in the address bar: `api.ts` when a
+ * session expires mid-screen, and `proxy.ts` when there is no session at all.
+ * Nobody read it, so signing back in always dumped the user on the dashboard
+ * (AUTH-17).
+ *
+ * Read from `window.location` on demand rather than with `useSearchParams`:
+ * that hook opts a page out of static rendering unless it is wrapped in a
+ * Suspense boundary, which is a lot of ceremony for one string.
+ *
+ * Only a same-site path is accepted. `//evil.example` and `https://evil.example`
+ * are absolute URLs wearing a path's clothing, and following one would turn the
+ * sign-in page into somebody else's redirect — the leading `//` and `\/` forms
+ * are refused for exactly that reason.
+ */
+function safeNextPath(): string | null {
+  const next = new URLSearchParams(window.location.search).get("next");
+
+  if (!next || !next.startsWith("/") || /^\/[\\/]/.test(next)) return null;
+
+  return next;
+}
+
 export default function Signin() {
   const router = useRouter();
 
@@ -23,7 +48,9 @@ export default function Signin() {
         password,
       });
 
-      router.push("/dashboard");
+      // `replace`, not `push`: going back must not land on the sign-in page of a
+      // session that is already open.
+      router.replace(safeNextPath() ?? "/dashboard");
     } catch (err) {
       setError(
         err instanceof Error

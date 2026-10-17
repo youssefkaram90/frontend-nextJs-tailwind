@@ -69,12 +69,32 @@ async function attemptRefresh(): Promise<RefreshResult> {
   return refreshPromise;
 }
 
+/**
+ * `fetch` that answers a connection failure in plain language.
+ *
+ * A network failure — offline, or the server not running — rejects with the
+ * browser's own `TypeError: Failed to fetch`. That is a developer string, and it
+ * is the one failure where no server-written sentence can exist, so it is
+ * translated here, once. The wording matches `app/lib/backend-relay.ts`, so the
+ * client and the proxy routes say the same thing.
+ */
+async function send(url: string, options: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The request took too long. Please try again.");
+    }
+    throw new Error("Could not reach the server. Check your connection.");
+  }
+}
+
 export async function api<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
   const url = endpoint.startsWith("/api/") ? endpoint : `${API_URL}${endpoint}`;
-  let response = await fetch(url, {
+  let response = await send(url, {
     ...options,
     credentials: "same-origin",
     headers: {
@@ -86,7 +106,7 @@ export async function api<T>(
   if (response.status === 401 && !endpoint.startsWith("/api/auth/")) {
     const refreshed = await attemptRefresh();
     if (refreshed === "success") {
-      response = await fetch(url, {
+      response = await send(url, {
         ...options,
         credentials: "same-origin",
         headers: {

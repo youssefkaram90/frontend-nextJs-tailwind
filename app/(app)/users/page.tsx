@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useUsers } from "@/app/lib/hooks/use-users";
-import { Users, Plus, Shield, ShieldOff, Search } from "lucide-react";
+import { Plus, Shield, ShieldOff, Search } from "lucide-react";
 import { TableSkeleton } from "@/app/components/skeleton";
 import { useSearch } from "@/app/lib/use-search";
 import { usePermissions } from "@/app/lib/hooks/use-permissions";

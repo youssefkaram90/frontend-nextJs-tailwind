@@ -16,10 +16,6 @@ export async function getAgriInputs(q?: string): Promise<AgriInputSeasonRow[]> {
   return api<AgriInputSeasonRow[]>(`/api/agri-inputs${params}`);
 }
 
-export async function getAgriInput(id: string): Promise<AgriInputSeasonRow> {
-  return api<AgriInputSeasonRow>(`/api/agri-inputs/${id}`);
-}
-
 /** Everything that moved this product's stock, newest first. */
 export async function getAgriInputMovements(
   id: string,

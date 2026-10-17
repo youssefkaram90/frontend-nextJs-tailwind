@@ -6,8 +6,10 @@ import {
   createSeason,
   getActiveSeason,
   getClosePreview,
+  getSeasonAlignment,
   getSeasons,
 } from "../services/seasons";
+import type { SeasonToOpen } from "../types/season";
 
 /**
  * The open season. `staleTime` is long because it changes about once a year —
@@ -32,6 +34,21 @@ export function useSeasons(enabled: boolean) {
     queryKey: ["seasons"],
     queryFn: getSeasons,
     enabled,
+  });
+}
+
+/**
+ * The season/calendar alignment sentence shown sitewide.
+ *
+ * Long `staleTime`: it only changes when a season is opened or closed, and those
+ * mutations already invalidate the `"seasons"` key. The answer is `null`
+ * `message` while the open season covers today, so the banner renders nothing.
+ */
+export function useSeasonAlignment() {
+  return useQuery({
+    queryKey: ["seasons", "alignment"],
+    queryFn: getSeasonAlignment,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -71,7 +88,7 @@ export function useClosePreview(id: string | null) {
 }
 
 /**
- * Close a season and open the next one.
+ * Close a season, then open the season the caller names — or none.
  *
  * Everything in this app belongs to a season, so a close invalidates every
  * cached list at once — otherwise the screens would keep showing the season
@@ -80,7 +97,8 @@ export function useClosePreview(id: string | null) {
 export function useCloseSeason() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => closeSeason(id),
+    mutationFn: ({ id, open }: { id: string; open: SeasonToOpen }) =>
+      closeSeason(id, open),
     onSuccess: () => {
       queryClient.invalidateQueries();
     },

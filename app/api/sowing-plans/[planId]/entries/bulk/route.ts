@@ -1,56 +1,18 @@
 import { NextRequest } from "next/server";
-import { env } from "@/app/lib/env";
+import { relayBody } from "@/app/lib/backend-relay";
 
-const BACKEND_URL = env.BACKEND_URL;
-const BACKEND_TIMEOUT_MS = 10_000;
-
-async function proxy(
-  request: NextRequest,
-  path: string,
-  init?: { method?: string; body?: string },
-) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
-  try {
-    const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}${path}`, {
-      method: init?.method ?? "GET",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: init?.body,
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-    const headers = new Headers();
-    for (const c of response.headers.getSetCookie())
-      headers.append("Set-Cookie", c);
-    headers.set("Content-Type", "application/json");
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return new Response(
-        JSON.stringify({ message: "Backend request timed out" }),
-        { status: 504, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-// POST /sowing-plans/:planId/entries/bulk
+/**
+ * POST /api/sowing-plans/:planId/entries/bulk — add several lines at once.
+ *
+ * Kept, although nothing calls it yet: the backend says the same thing in its own
+ * comment (*"no client calls this route today"*, SPLAN-05). It is the natural fit
+ * for the missing "add a line" screen and for any repeat of the Excel import
+ * (SOW-08).
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ planId: string }> },
 ) {
   const { planId } = await params;
-  const body = await request.json();
-  return proxy(request, `/sowing-plans/${planId}/entries/bulk`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return relayBody(request, `/sowing-plans/${planId}/entries/bulk`, "POST");
 }

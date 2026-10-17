@@ -6,6 +6,7 @@ import { useDelivery, useDeleteDelivery } from "@/app/lib/hooks/use-deliveries";
 import { useCaps } from "@/app/lib/hooks/use-permissions";
 import { ArrowLeft, Truck, Pencil, Trash2 } from "lucide-react";
 import { DetailCardSkeleton, TableSkeleton } from "@/app/components/skeleton";
+import { formatQuantity } from "@/app/lib/format-quantity";
 
 export default function DeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,7 +22,7 @@ export default function DeliveryDetailPage() {
     try {
       await deleteDelivery.mutateAsync(id);
       router.push("/deliveries");
-    } catch (err) {
+    } catch {
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -149,7 +150,9 @@ export default function DeliveryDetailPage() {
                 </span>
               )}
               {peatTotal > 0 && (
-                <span className="ml-2">Peat: {peatTotal.toFixed(2)}</span>
+                <span className="ml-2">
+                  Peat: {formatQuantity(peatTotal, "PEAT")}
+                </span>
               )}
             </p>
           </div>

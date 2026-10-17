@@ -1,89 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  useAdjustStock,
-  useStockItems,
-  useStockSummary,
-} from "@/app/lib/hooks/use-stock";
-import {
-  MOVEMENT_REASONS,
-  MovementReason,
-  type StockSummary,
-} from "@/app/lib/types/stock";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { useStockItemsPage, useStockSummary } from "@/app/lib/hooks/use-stock";
+import { type StockSummary } from "@/app/lib/types/stock";
 import { SeasonEmptyState } from "@/app/components/ui/season-empty-state";
 import { useSearch } from "@/app/lib/use-search";
-import { usePermissions } from "@/app/lib/hooks/use-permissions";
-import { useToast } from "@/app/lib/toast-context";
+import { SearchBar } from "@/app/components/ui";
+import { formatQuantity } from "@/app/lib/format-quantity";
 import { useState } from "react";
-
-type Direction = "add" | "remove";
 
 export default function StockPage() {
   const router = useRouter();
   const { query, setQuery, debouncedQuery } = useSearch();
+  const [page, setPage] = useState(1);
+
+  // A new search starts at page 1. Without this the user types something
+  // shorter and lands on "page 4 of 1", which reads as an empty result.
+
   const {
-    data: items = [],
+    data: pageData,
     isPending,
     error,
-  } = useStockItems(debouncedQuery || undefined);
+  } = useStockItemsPage(debouncedQuery || undefined, page);
+  const items = pageData?.items ?? [];
+
   const { data: summary = {} as StockSummary } = useStockSummary();
-
-  const { isAdmin } = usePermissions();
-  const adjustStock = useAdjustStock();
-  const { showToast } = useToast();
-
-  const [lotId, setLotId] = useState("");
-  const [direction, setDirection] = useState<Direction>("add");
-  const [quantity, setQuantity] = useState("");
-  const [reason, setReason] = useState<MovementReason>("opening");
-  const [note, setNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const fieldClass =
-    "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500";
-
-  // Only the reasons that make sense for the chosen direction. "correction"
-  // works both ways, so it is always offered.
-  const availableReasons = MOVEMENT_REASONS.filter(
-    (r) => r.direction === direction || r.direction === "both",
-  );
-
-  async function onAdjust(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!lotId) {
-      showToast("Choose a lot first", "error");
-      return;
-    }
-
-    const amount = Number(quantity);
-    if (!amount || amount <= 0) {
-      showToast("Enter a quantity greater than zero", "error");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await adjustStock.mutateAsync({
-        stockItemId: lotId,
-        quantity: direction === "add" ? amount : -amount,
-        reason,
-        note: note.trim() || undefined,
-      });
-      showToast("Stock adjusted");
-      setQuantity("");
-      setNote("");
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Something went wrong",
-        "error",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   if (isPending) {
     return (
@@ -142,9 +83,7 @@ export default function StockPage() {
                     {label}
                   </p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {key === "PEAT"
-                      ? (data?.totalQuantity ?? 0).toFixed(2)
-                      : (data?.totalQuantity ?? 0).toLocaleString()}
+                    {formatQuantity(data?.totalQuantity ?? 0, key)}
                   </p>
                   <p className="text-xs text-gray-400">
                     {data?.lots ?? 0} lot{data?.lots !== 1 ? "s" : ""}
@@ -156,128 +95,17 @@ export default function StockPage() {
         })}
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search stock by name, lot, supplier, type…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition text-sm"
-        />
-      </div>
+      {/* Search Bar — the query lives here, the box is shared (STOCK-05) */}
+      <SearchBar
+        value={query}
+        onChange={(value) => {
+          setQuery(value);
+          setPage(1);
+        }}
+        placeholder="Search stock by name, lot, supplier, type…"
+      />
 
       {/* Stock Items Table */}
-      {/* Adjust stock — ADMIN-only: this is bookkeeping, not daily work. */}
-      {isAdmin && (
-        <form
-          onSubmit={onAdjust}
-          className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-4"
-        >
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Adjust stock
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="lg:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Lot
-              </label>
-              <select
-                value={lotId}
-                onChange={(e) => setLotId(e.target.value)}
-                className={fieldClass}
-              >
-                <option value="">Choose a lot…</option>
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.productName} — lot {item.lotNumber} (
-                    {item.currentQuantity})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Direction
-              </label>
-              <select
-                value={direction}
-                onChange={(e) => {
-                  const next = e.target.value as Direction;
-                  setDirection(next);
-                  const first = MOVEMENT_REASONS.find(
-                    (r) => r.direction === next || r.direction === "both",
-                  );
-                  if (first) setReason(first.value);
-                }}
-                className={fieldClass}
-              >
-                <option value="add">Add to stock</option>
-                <option value="remove">Take out of stock</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Quantity
-              </label>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="0"
-                className={fieldClass}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Reason
-              </label>
-              <select
-                value={reason}
-                onChange={(e) => setReason(e.target.value as MovementReason)}
-                className={fieldClass}
-              >
-                {availableReasons.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="lg:col-span-3">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Note (optional)
-              </label>
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="e.g. counted in the warehouse"
-                className={fieldClass}
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-xl bg-green-600 py-3 text-sm font-semibold text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-8"
-          >
-            {submitting ? "Saving…" : "Save adjustment"}
-          </button>
-        </form>
-      )}
-
       <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -362,9 +190,7 @@ export default function StockPage() {
                       {item.supplierName}
                     </td>
                     <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
-                      {item.productType === "PEAT"
-                        ? item.currentQuantity.toFixed(2)
-                        : item.currentQuantity.toLocaleString()}
+                      {formatQuantity(item.currentQuantity, item.productType)}
                     </td>
                   </tr>
                 ))}
@@ -373,6 +199,32 @@ export default function StockPage() {
           </div>
         )}
       </div>
+
+      {/* Paging — the endpoint only pages when `page` is sent, so this is what
+          keeps a filled season off a single response (STOCK-07). */}
+      {pageData && pageData.total > 0 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500 dark:text-gray-400">
+            {items.length} of {pageData.total} shown
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-gray-600 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300"
+            >
+              Previous
+            </button>
+            <button
+              disabled={!pageData.hasMore}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-gray-600 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

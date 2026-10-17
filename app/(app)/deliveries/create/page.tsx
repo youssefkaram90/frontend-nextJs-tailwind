@@ -7,16 +7,19 @@ import { useState, useEffect, useMemo } from "react";
 import { createDelivery } from "@/app/lib/services/deliveries";
 import { useToast } from "@/app/lib/toast-context";
 import { StockType, ProductType } from "@/app/lib/types/delivery";
+import { formatQuantity } from "@/app/lib/format-quantity";
 import { ArrowLeft, ChevronDown, Copy, Plus, Trash2 } from "lucide-react";
 import {
   createDeliverySchema,
   type CreateDeliveryFormData,
 } from "@/app/schemas/delivery.schema";
+import { collectValidationProblems } from "@/app/lib/validation-problems";
 
 export default function CreateDeliveryPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [validationProblems, setValidationProblems] = useState<string[]>([]);
 
   const {
     register,
@@ -82,9 +85,20 @@ export default function CreateDeliveryPage() {
 
   const { showToast } = useToast();
 
+  /**
+   * A refused submit has to say so (X-03). Without this, "Create Delivery" did
+   * nothing at all whenever a lot was missing a required field — the field itself
+   * can be in a collapsed lot, out of sight.
+   */
+  const onInvalid = (formErrors: unknown) => {
+    setValidationProblems(collectValidationProblems(formErrors));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   async function onSubmit(data: CreateDeliveryFormData) {
     setSubmitting(true);
     setServerError(null);
+    setValidationProblems([]);
 
     try {
       const payload = {
@@ -139,7 +153,7 @@ export default function CreateDeliveryPage() {
       </button>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         {/* Page Header + Submit */}
         <div className="flex items-center justify-between">
           <div>
@@ -163,6 +177,18 @@ export default function CreateDeliveryPage() {
         {serverError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
             {serverError}
+          </div>
+        )}
+        {validationProblems.length > 0 && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold">
+              Nothing was saved — some fields still need a value.
+            </p>
+            <ul className="mt-1.5 list-disc pl-5 space-y-0.5">
+              {validationProblems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
           </div>
         )}
         {/* Delivery Details */}
@@ -509,7 +535,7 @@ export default function CreateDeliveryPage() {
             <div className="text-sm text-gray-500 dark:text-gray-400">
               {fields.length} lot{fields.length !== 1 ? "s" : ""}
               {seedsTotal > 0 && ` · Seeds: ${seedsTotal.toLocaleString()}`}
-              {peatTotal > 0 && ` · Peat: ${peatTotal.toFixed(2)}`}
+              {peatTotal > 0 && ` · Peat: ${formatQuantity(peatTotal, "PEAT")}`}
             </div>
             <button
               type="submit"

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
+  ArrowLeft,
   Beaker,
   History,
   Plus,
@@ -194,6 +196,17 @@ export default function AgriInputsPage() {
 
   return (
     <div className="p-4 space-y-6">
+      {/*
+        This screen is reached from Crop Care, not from the sidebar (user,
+        2026-10-11) — so it says where "back" goes, like every other screen.
+      */}
+      <Link
+        href="/crop-care"
+        className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to Crop Care
+      </Link>
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Agri-inputs
@@ -253,7 +266,7 @@ export default function AgriInputsPage() {
           </div>
           {selectable.length === 0 && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Every product in the catalogue is already on this season's list.
+              Every product in the catalogue is already on this season&apos;s list.
             </p>
           )}
         </form>
@@ -262,7 +275,7 @@ export default function AgriInputsPage() {
       {/* This season's list */}
       <div className={cardClass}>
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-          This season's products
+          This season&apos;s products
         </h2>
 
         {rows.length === 0 ? (

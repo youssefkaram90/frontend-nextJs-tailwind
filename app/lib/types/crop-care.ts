@@ -33,7 +33,6 @@ export interface PhytosanitaryProduct {
   category: string | null;
   unit: string | null;
   notes: string | null;
-  currentQuantity: number;
   createdAt: string;
   updatedAt: string;
 }

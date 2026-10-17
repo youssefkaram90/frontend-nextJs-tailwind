@@ -1,5 +1,12 @@
 import { api } from "../api";
-import type { ActiveSeason, ClosePreview, Season } from "../types/season";
+import type {
+  ActiveSeason,
+  ClosePreview,
+  CloseResult,
+  Season,
+  SeasonAlignment,
+  SeasonToOpen,
+} from "../types/season";
 
 /** The one open season. Open to any signed-in user — every screen shows it. */
 export async function getActiveSeason(): Promise<ActiveSeason | null> {
@@ -9,6 +16,16 @@ export async function getActiveSeason(): Promise<ActiveSeason | null> {
 /** Every season, newest first. ADMIN only — closed seasons are restricted. */
 export async function getSeasons(): Promise<Season[]> {
   return api<Season[]>("/api/seasons");
+}
+
+/**
+ * Does the open season still match today's date?
+ *
+ * One sentence, worded for the caller by the backend (an administrator gets the
+ * actionable version). It never blocks anything — it is a banner.
+ */
+export async function getSeasonAlignment(): Promise<SeasonAlignment> {
+  return api<SeasonAlignment>("/api/seasons/alignment");
 }
 
 /** Creates the season CLOSED; open it with activateSeason. */
@@ -31,7 +48,16 @@ export async function getClosePreview(id: string): Promise<ClosePreview> {
   return api<ClosePreview>(`/api/seasons/${id}/close-preview`);
 }
 
-/** Closes the season and answers with the NEW season the server opened. */
-export async function closeSeason(id: string): Promise<Season> {
-  return api<Season>(`/api/seasons/${id}/close`, { method: "POST" });
+/**
+ * Closes the season, then opens `open` — the next season, a chosen season id,
+ * or none. The server creates the next season if it does not exist yet.
+ */
+export async function closeSeason(
+  id: string,
+  open: SeasonToOpen,
+): Promise<CloseResult> {
+  return api<CloseResult>(`/api/seasons/${id}/close`, {
+    method: "POST",
+    body: JSON.stringify({ open }),
+  });
 }

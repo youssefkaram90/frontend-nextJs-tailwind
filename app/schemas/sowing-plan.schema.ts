@@ -36,12 +36,9 @@ const lpmEntrySchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.coerce.number().min(0, "Must be at least 0"),
   ),
-  // Seeds to sow. Seeds/metre is DERIVED from this by the server — the planner
-  // never types a seed rate.
-  plannedQuantity: z.preprocess(
-    (v) => (v === "" ? undefined : v),
-    z.coerce.number().int().min(1, "Seeds is required"),
-  ),
+  // NO seed total: a field line is planned by its DENSITY, and the server works
+  // the total out from the lines, the metres per line and the farm's own figure
+  // (user, 2026-10-11). It used to be typed here.
   remark: z.string().optional(),
 });
 
@@ -63,6 +60,35 @@ export const createSowingPlanSchema = z.discriminatedUnion("planType", [
   ssmPlanSchema,
   lpmPlanSchema,
 ]);
+
+/**
+ * One entry, on its own — for adding a line to a plan that already exists, and
+ * for correcting one (SOW-08).
+ *
+ * The fields are the *same objects* the create form validates with, so a line
+ * added later can never obey different rules from one created with the plan.
+ * The only addition is `plannedDate`: the create form keeps a single date for the
+ * whole plan, but a line added afterwards needs its own, and the backend DTO
+ * requires one per entry.
+ */
+const plannedDateField = z.string().min(1, "Planned date is required");
+
+export const addSsmPlanEntrySchema = ssmEntrySchema.extend({
+  plannedDate: plannedDateField,
+});
+
+export const addLpmPlanEntrySchema = lpmEntrySchema.extend({
+  plannedDate: plannedDateField,
+});
+
+/** The schema for a single entry, chosen by the plan's type. */
+export function planEntrySchemaFor(planType: "SSM" | "LPM") {
+  return planType === "SSM" ? addSsmPlanEntrySchema : addLpmPlanEntrySchema;
+}
+
+export type PlanEntryAddFormInput =
+  | z.input<typeof addSsmPlanEntrySchema>
+  | z.input<typeof addLpmPlanEntrySchema>;
 
 // ── Excel import (unchanged) ──
 export const excelImportSchema = z.object({

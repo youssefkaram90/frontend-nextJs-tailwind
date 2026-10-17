@@ -18,8 +18,8 @@ export default function CompliancePage() {
         <PageHeader
           title="Compliance"
           description="Product × location application matrix"
-          backTo="/phytosanitary"
-          backLabel="Back to Phytosanitary"
+          backTo="/crop-care"
+          backLabel="Back to Crop Care"
         />
         <div className="mt-6 text-gray-400">Loading…</div>
       </div>
@@ -55,8 +55,8 @@ export default function CompliancePage() {
       <PageHeader
         title="Compliance"
         description="Which required products were applied to tunnels & sectors"
-        backTo="/phytosanitary"
-        backLabel="Back to Phytosanitary"
+        backTo="/crop-care"
+        backLabel="Back to Crop Care"
       />
 
       {!program ? (

@@ -13,35 +13,65 @@ export async function getPlantStocks(
 }
 
 /**
- * Record a sample count for one sowing.
+ * The readings for one batch — saved whole.
  *
- * Supply EITHER `countedPlants` (plants present) or `missingPlants` (gaps) —
- * never both. For SSM send `location` (the tunnel); for LPM send `line` and
- * `rowsInspected`. Every figure the screen shows (density, estimated plants,
- * germination) is calculated by the server from the sample — the client never
- * computes them.
+ * One entry per SAMPLE, in the order they were taken — a tray (SSM) or one metre
+ * of one row (LPM, which says which line). Every figure the screen shows (density,
+ * estimated plants, germination) is calculated by the server from them
+ * (PSTOCK-24); the client never computes one.
+ *
+ * Supply EITHER `countedPlants` or `missingPlants` per reading — never both, and
+ * never a total: the total IS the readings.
  */
-export interface CreatePlantCountPayload {
-  countType: "TRAY" | "ROW_METRE";
-  /** SSM: trays inspected. LPM: 1-metre samples = row-metres covered. */
-  sampleSize: number;
+export interface PlantCountSampleInput {
+  /** LPM only — the line this reading came from (1..lines) */
+  line?: number;
   countedPlants?: number;
   missingPlants?: number;
-  /** SSM only — the tunnel being counted. */
+}
+
+export interface SavePlantCountPayload {
+  countType: "TRAY" | "ROW_METRE";
+  /**
+   * SSM only — the tunnel being counted. A batch spread over two tunnels is
+   * counted once per tunnel, each with its own readings.
+   */
   location?: string;
-  /** LPM only — which line was sampled. */
-  line?: number;
-  /** LPM only — how many of the 7 rows were covered. */
-  rowsInspected?: number;
+  /** The COMPLETE list. This is what the count is, not an addition to it. */
+  samples: PlantCountSampleInput[];
   notes?: string;
 }
 
-export async function createPlantCount(
+/**
+ * Save the readings of one batch (PUT, PSTOCK-24 → decided 2026-10-11).
+ *
+ * A batch has ONE count with ONE germination figure, and the readings are what you
+ * add to it — so adding a reading, correcting a typo and taking one back are all
+ * the same act: send the whole list. The server merges it into the batch's count
+ * and hands the row back as it now stands.
+ */
+export async function savePlantCount(
   plantStockId: string,
-  payload: CreatePlantCountPayload,
+  payload: SavePlantCountPayload,
 ): Promise<PlantCount> {
   return api<PlantCount>(`/api/plant-stock/${plantStockId}/counts`, {
-    method: "POST",
+    method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+/**
+ * Take one count back out (PSTOCK-10).
+ *
+ * Every count is averaged into the germination figure of that tunnel or line, so
+ * a mistyped sample has to be removable — otherwise a wrong number stays in the
+ * average for ever. The id here is the COUNT's, not the batch's.
+ */
+export async function deletePlantCount(
+  countId: string,
+): Promise<{ message: string; plantStockId: string }> {
+  return api<{ message: string; plantStockId: string }>(
+    `/api/plant-stock/counts/${countId}`,
+    { method: "DELETE" },
+  );
 }

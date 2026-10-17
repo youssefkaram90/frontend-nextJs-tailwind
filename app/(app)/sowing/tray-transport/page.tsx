@@ -9,6 +9,7 @@ import {
   createTunnelAssignments,
   deleteTunnelAssignment,
   createTunnel,
+  updateTunnel,
   deleteTunnel as deleteTunnelApi,
 } from "@/app/lib/services/sowing";
 import type { TunnelAssignment } from "@/app/lib/services/sowing";
@@ -25,6 +26,8 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Pencil,
+  Save,
   CheckCircle,
 } from "lucide-react";
 
@@ -49,6 +52,15 @@ export default function TrayTransportPage() {
   const [tunnelNumber, setTunnelNumber] = useState("");
   const [tunnelLocation, setTunnelLocation] = useState("");
   const [tunnelCapacity, setTunnelCapacity] = useState("");
+
+  /**
+   * The tunnel being corrected, or null while the form is adding a new one (TNL-1).
+   *
+   * Only an EMPTY tunnel can be corrected, and the server is the one that says so
+   * (`canEdit` on each row): a tunnel's number is copied onto the sowings recorded
+   * in it, so changing it after the fact would leave those copies behind.
+   */
+  const [editingTunnel, setEditingTunnel] = useState<Tunnel | null>(null);
 
   // Inline assignment form (per sowing)
   const [assigningFor, setAssigningFor] = useState<{
@@ -80,25 +92,60 @@ export default function TrayTransportPage() {
   }
 
   // ── Tunnel CRUD ──
-  async function handleCreateTunnel(e: React.FormEvent) {
+  async function handleSubmitTunnel(e: React.FormEvent) {
     e.preventDefault();
     if (!tunnelNumber.trim() || !tunnelCapacity) return;
     setError(null);
     try {
-      await createTunnel({
+      const dto = {
         number: tunnelNumber.trim(),
         location: tunnelLocation.trim() || undefined,
         capacity: Number(tunnelCapacity),
-      });
-      setSuccess(`Tunnel "${tunnelNumber.trim()}" created`);
-      setTunnelNumber("");
-      setTunnelLocation("");
-      setTunnelCapacity("");
+      };
+
+      if (editingTunnel) {
+        await updateTunnel(editingTunnel.id, dto);
+        setSuccess(`Tunnel "${dto.number}" corrected`);
+      } else {
+        await createTunnel(dto);
+        setSuccess(`Tunnel "${dto.number}" created`);
+      }
+
+      closeTunnelForm();
       const updated = await getTunnels();
       setTunnels(updated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create tunnel");
+      setError(
+        err instanceof Error
+          ? err.message
+          : editingTunnel
+            ? "Failed to correct tunnel"
+            : "Failed to create tunnel",
+      );
     }
+  }
+
+  /** Empty the form and leave correcting mode. */
+  function closeTunnelForm() {
+    setEditingTunnel(null);
+    setTunnelNumber("");
+    setTunnelLocation("");
+    setTunnelCapacity("");
+  }
+
+  /**
+   * Open the form on a tunnel that can still be corrected.
+   *
+   * The button that calls this is disabled for a tunnel that is already used, so
+   * the server's refusal is never the first thing the operator learns.
+   */
+  function handleEditTunnel(tunnel: Tunnel) {
+    setEditingTunnel(tunnel);
+    setTunnelNumber(tunnel.number);
+    setTunnelLocation(tunnel.location ?? "");
+    setTunnelCapacity(String(tunnel.capacity));
+    setError(null);
+    setSuccess(null);
   }
 
   async function handleDeleteTunnel(id: string, number: string) {
@@ -132,12 +179,18 @@ export default function TrayTransportPage() {
         ],
       });
       setSuccess(`${trays} trays of "${sowing.variety}" assigned`);
-      // Reload data
-      const [allAssignments, pending] = await Promise.all([
+      // Reload data — including the TUNNELS (TRAY-08).
+      //
+      // `canEdit` is the server's answer (TNL-1), and sending trays into a tunnel
+      // changes it: the tunnel is no longer empty, so it may no longer be
+      // corrected. Without this re-read the figure stayed as it was at page load.
+      const [allAssignments, tunnelList, pending] = await Promise.all([
         getTunnelAssignments(),
+        getTunnels(),
         getPendingTransport(),
       ]);
       setAssignments(allAssignments);
+      setTunnels(tunnelList);
       setPendingGroups(pending);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Assignment failed");
@@ -149,11 +202,18 @@ export default function TrayTransportPage() {
   async function handleDeleteAssignment(assignmentId: string) {
     try {
       await deleteTunnelAssignment(assignmentId);
-      const [allAssignments, pending] = await Promise.all([
+      // The tunnels are re-read here for the same reason as on assign (TRAY-08), and
+      // this is the one that matters: taking the LAST transport out makes the tunnel
+      // empty again, so the server's `canEdit` flips back to true and the Pencil
+      // becomes usable. A stale list kept it disabled, which looked exactly like the
+      // emptying had not worked (TRAY-07).
+      const [allAssignments, tunnelList, pending] = await Promise.all([
         getTunnelAssignments(),
+        getTunnels(),
         getPendingTransport(),
       ]);
       setAssignments(allAssignments);
+      setTunnels(tunnelList);
       setPendingGroups(pending);
       setSuccess("Assignment removed");
     } catch (err) {
@@ -391,8 +451,14 @@ export default function TrayTransportPage() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           Tunnels ({tunnels.length})
         </h2>
+        {editingTunnel && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Correcting tunnel {editingTunnel.number} — it is still empty, so
+            nothing else has to change with it.
+          </p>
+        )}
         <form
-          onSubmit={handleCreateTunnel}
+          onSubmit={handleSubmitTunnel}
           className="flex flex-wrap items-end gap-3"
         >
           <div>
@@ -434,17 +500,34 @@ export default function TrayTransportPage() {
           </div>
           <button
             type="submit"
-            disabled={!tunnelCaps.create}
+            disabled={editingTunnel ? !tunnelCaps.edit : !tunnelCaps.create}
             title={
-              tunnelCaps.create
-                ? undefined
-                : "You don't have permission to add tunnels"
+              editingTunnel
+                ? tunnelCaps.edit
+                  ? undefined
+                  : "You don't have permission to correct tunnels"
+                : tunnelCaps.create
+                  ? undefined
+                  : "You don't have permission to add tunnels"
             }
             className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Plus className="h-4 w-4" />
-            Add
+            {editingTunnel ? (
+              <Save className="h-4 w-4" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            {editingTunnel ? "Save" : "Add"}
           </button>
+          {editingTunnel && (
+            <button
+              type="button"
+              onClick={closeTunnelForm}
+              className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium text-sm"
+            >
+              Cancel
+            </button>
+          )}
         </form>
         {tunnels.length > 0 && (
           <div className="overflow-x-auto">
@@ -494,19 +577,36 @@ export default function TrayTransportPage() {
                           t.capacity.toLocaleString()}
                       </td>
                       <td className="px-4 py-2">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTunnel(t.id, t.number)}
-                          disabled={!tunnelCaps.delete}
-                          title={
-                            tunnelCaps.delete
-                              ? undefined
-                              : "You don't have permission to delete tunnels"
-                          }
-                          className="text-red-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          {tunnelCaps.edit && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditTunnel(t)}
+                              disabled={!t.canEdit}
+                              title={
+                                t.canEdit
+                                  ? "Correct this tunnel"
+                                  : "Only an empty tunnel can be corrected — once a sowing or a harvest points at it, its number is part of that history."
+                              }
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTunnel(t.id, t.number)}
+                            disabled={!tunnelCaps.delete}
+                            title={
+                              tunnelCaps.delete
+                                ? undefined
+                                : "You don't have permission to delete tunnels"
+                            }
+                            className="text-red-400 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -1,65 +1,27 @@
 import { NextRequest } from "next/server";
-import { env } from "@/app/lib/env";
+import { relay, relayBody } from "@/app/lib/backend-relay";
 
-const BACKEND_URL = env.BACKEND_URL;
-const BACKEND_TIMEOUT_MS = 10_000;
-
-async function proxy(
-  request: NextRequest,
-  path: string,
-  init?: { method?: string; body?: string },
-) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
-  try {
-    const cookie = request.headers.get("cookie") || "";
-    const response = await fetch(`${BACKEND_URL}${path}`, {
-      method: init?.method ?? "GET",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: init?.body,
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-    const headers = new Headers();
-    for (const c of response.headers.getSetCookie())
-      headers.append("Set-Cookie", c);
-    headers.set("Content-Type", "application/json");
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return new Response(
-        JSON.stringify({ message: "Backend request timed out" }),
-        { status: 504, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-// GET  /sowing-plans/:planId/entries
+/** GET /api/sowing-plans/:planId/entries — the lines inside one plan. */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ planId: string }> },
 ) {
   const { planId } = await params;
-  return proxy(request, `/sowing-plans/${planId}/entries`);
+  return relay(request, `/sowing-plans/${planId}/entries`);
 }
 
-// POST /sowing-plans/:planId/entries
+/**
+ * POST /api/sowing-plans/:planId/entries — add one line to an existing plan.
+ *
+ * The backend route exists today and **nothing calls it**: the web's
+ * `useAddPlanEntry` hook is defined and unused, and no phone screen offers it.
+ * Once a plan is created, its lines can be deleted, closed or reopened — but
+ * never added (SOW-08).
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ planId: string }> },
 ) {
   const { planId } = await params;
-  const body = await request.json();
-  return proxy(request, `/sowing-plans/${planId}/entries`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return relayBody(request, `/sowing-plans/${planId}/entries`, "POST");
 }

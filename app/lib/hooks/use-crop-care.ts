@@ -12,6 +12,7 @@ import {
   getCompliance,
   getOperations,
   createOperation,
+  updateOperation,
   deleteOperation,
   getPlans,
   getPlan,
@@ -23,6 +24,7 @@ import {
   deletePlanEntry,
   executePlanEntry,
 } from "@/app/lib/services/crop-care";
+import type { CropOperationInput } from "@/app/lib/services/crop-care";
 
 // -------------------------------------------------------------------
 // Products
@@ -124,6 +126,17 @@ export function useCompliance() {
 export function useOperations(params: {
   q?: string;
   operationType?: string;
+  /**
+   * One location only — a tunnel or a sector.
+   *
+   * Kept because the backend (`findAllOperations`) and the service both accept
+   * it, and it is the precise form of "what was done in T3?" — a link such as
+   * `/crop-care?tunnel=<id>` would need nothing new. The operations list uses the
+   * SEARCH box instead (CROP-11, user 2026-10-11): typing `T1` goes through `q`,
+   * which now matches tunnel and sector names as well as notes and products.
+   */
+  targetType?: string;
+  targetId?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -141,6 +154,29 @@ export function useCreateOperation() {
       qc.invalidateQueries({ queryKey: ["crop-operations"] });
       qc.invalidateQueries({ queryKey: ["phytosanitary-compliance"] });
       qc.invalidateQueries({ queryKey: ["crop-care-plans"] });
+      // Logging a treatment takes its product out of the season's stock, so the
+      // balances are stale the moment this succeeds (CROP-16).
+      qc.invalidateQueries({ queryKey: ["agri-inputs"] });
+    },
+  });
+}
+
+/**
+ * Correct a logged operation (CROP-14).
+ *
+ * The season's balances and the product's movement list are invalidated as well,
+ * because a correction can move stock: a changed dose gives the old amount back
+ * and takes the new one out.
+ */
+export function useUpdateOperation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: CropOperationInput }) =>
+      updateOperation(id, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crop-operations"] });
+      qc.invalidateQueries({ queryKey: ["phytosanitary-compliance"] });
+      qc.invalidateQueries({ queryKey: ["agri-inputs"] });
     },
   });
 }
@@ -152,6 +188,11 @@ export function useDeleteOperation() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["crop-operations"] });
       qc.invalidateQueries({ queryKey: ["phytosanitary-compliance"] });
+      // Deleting gives back what the operation had used, so the season's balances
+      // and the product's movement list are stale too — they were not, and the
+      // stock screen kept showing the deducted number until something else
+      // happened to refetch it (CROP-16, found while writing CROP-14).
+      qc.invalidateQueries({ queryKey: ["agri-inputs"] });
     },
   });
 }
@@ -260,6 +301,9 @@ export function useExecutePlanEntry() {
       });
       qc.invalidateQueries({ queryKey: ["crop-operations"] });
       qc.invalidateQueries({ queryKey: ["phytosanitary-compliance"] });
+      // Executing an entry takes its product out of the season's stock too, so the
+      // balances are stale the moment this succeeds (CROP-16).
+      qc.invalidateQueries({ queryKey: ["agri-inputs"] });
     },
   });
 }

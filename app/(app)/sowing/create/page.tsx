@@ -1,22 +1,26 @@
 "use client";
 
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import {
+  useForm,
+  useFieldArray,
+  useWatch,
+  type FieldErrors,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useMemo, useEffect } from "react";
-import {
-  executeSSM,
-  executeLPM,
-  getSowingPlan,
-} from "@/app/lib/services/sowing";
+import { formatQuantity } from "@/app/lib/format-quantity";
+import { getSowingPlan } from "@/app/lib/services/sowing";
 import {
   useTunnels,
   useSectors,
   useStockItemsForSowing,
   useSowingPlans,
+  useExecuteSSM,
+  useExecuteLPM,
 } from "@/app/lib/hooks/use-sowing";
 import type { StockItem } from "@/app/lib/types/stock";
-import type { Tunnel, Sector, SowingPlan } from "@/app/lib/types/sowing";
+import type { Tunnel, Sector } from "@/app/lib/types/sowing";
 import { PlanStatus } from "@/app/lib/types/sowing";
 import {
   ArrowLeft,
@@ -29,11 +33,17 @@ import {
 import {
   createSowingSchema,
   type SowingCreateFormInput,
+  type SowingRecordFormInput,
   DEFAULT_SEEDS_PER_TRAY,
 } from "@/app/schemas/sowing.schema";
-import { ROWS_PER_LINE, seedsPerRowMetre } from "@/app/lib/sowing-constants";
+import {
+  ROWS_PER_LINE,
+  seedsPerRowMetre,
+  TRAYS_PER_PEAT_BALL,
+} from "@/app/lib/sowing-constants";
+import { useSettingValue } from "@/app/lib/hooks/use-settings";
 
-const TRAYS_PER_BIG_BALL = 380;
+import { collectValidationProblems } from "@/app/lib/validation-problems";
 
 function groupStockByVariety(items: StockItem[]) {
   const map: Record<
@@ -60,20 +70,17 @@ export default function CreateSowingPage() {
   const [planLocation, setPlanLocation] = useState("");
   const [sectorDisplayCode, setSectorDisplayCode] = useState("");
   const [openEntry, setOpenEntry] = useState<number | null>(0);
+  const [validationError, setValidationError] = useState(false);
+  const [validationProblems, setValidationProblems] = useState<string[]>([]);
 
   const { data: tunnelData } = useTunnels();
   const tunnels = (tunnelData ?? []) as Tunnel[];
   const { data: sectorData } = useSectors();
   const sectors = (sectorData ?? []) as Sector[];
-  const { data } = useStockItemsForSowing();
-  const stockItems = (data ?? []) as StockItem[];
+  const { data: stockData } = useStockItemsForSowing();
+  const stockItems = useMemo(() => stockData ?? [], [stockData]);
   const { data: plansData } = useSowingPlans();
-  const allPlans = (plansData ?? []) as SowingPlan[];
-
-  const activePlans = useMemo(
-    () => allPlans.filter((p) => p.status !== PlanStatus.COMPLETED),
-    [allPlans],
-  );
+  const allPlans = useMemo(() => plansData ?? [], [plansData]);
 
   const urlPlanEntryIds = searchParams.get("planEntryIds") || "";
   const urlPlanEntryId = searchParams.get("planEntryId") || "";
@@ -98,10 +105,11 @@ export default function CreateSowingPage() {
           code: "",
           lotNumber: "",
           stockType: "",
+          peatLotNumber: "",
+          peatStockType: "CVT",
           tunnelId: "",
           sectorId: "",
           numberOfTrays: "",
-          seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
           quantityUsed: "",
           lines: undefined,
           metersPerLine: undefined,
@@ -118,8 +126,72 @@ export default function CreateSowingPage() {
   });
   const sowingType = useWatch({ control, name: "sowingType" });
 
+  /**
+   * The plans worth offering: still open, and of the kind being recorded.
+   *
+   * Every plan used to be listed whatever was being sown (user, 2026-10-11) — so
+   * with "LPM — Field" chosen a tunnel plan was still in the dropdown, and the
+   * server refused it at save.
+   */
+  const selectablePlans = useMemo(
+    () =>
+      allPlans.filter(
+        (p) => p.status !== PlanStatus.COMPLETED && p.planType === sowingType,
+      ),
+    [allPlans, sowingType],
+  );
+
+  /**
+   * The plan this page was opened FROM, when Execute was pressed on a plan line
+   * (`?planId=`). It is not a choice any more — it is shown as text below, so the
+   * sowing cannot be filed against a different plan by accident.
+   */
+  const presetPlan = urlPlanId
+    ? (allPlans.find((p) => p.id === urlPlanId) ?? null)
+    : null;
+
   const stockMap = useMemo(() => groupStockByVariety(stockItems), [stockItems]);
   const varieties = useMemo(() => Object.keys(stockMap).sort(), [stockMap]);
+
+  /**
+   * The peat lots this season has, for the picker beside the seeds lot.
+   *
+   * Peat is tracked per lot now (decided 2026-10-05), so a sowing has to say
+   * which lot it takes — it is no longer one pool. The list is the season's PEAT
+   * stock items, which the form already fetches for the seeds lots, so nothing
+   * new is requested.
+   */
+  const peatItems = useMemo(
+    () => stockItems.filter((item) => item.productType === "PEAT"),
+    [stockItems],
+  );
+
+  /**
+   * Seeds per tray as the farm has set it (SOW-11, phase 3).
+   *
+   * Shown as the field's placeholder and used for the live total — the compiled
+   * constant is only the fallback for the moment before the fetch lands. The form
+   * no longer SENDS this figure unless the operator types one, so the server's
+   * setting is what a sowing actually uses.
+   */
+  const seedsPerTraySetting = useSettingValue(
+    "DEFAULT_SEEDS_PER_TRAY",
+    DEFAULT_SEEDS_PER_TRAY,
+  );
+  const traysPerPeatBall = useSettingValue(
+    "TRAYS_PER_PEAT_BALL",
+    TRAYS_PER_PEAT_BALL,
+  );
+
+  /**
+   * Saving goes through the hooks, not the service functions (SOW-09).
+   *
+   * The hooks are what invalidate the cache — the sowing list, the plans and the
+   * stock figures are all held for 30 s to 2 minutes — so a save that skips them
+   * leaves the operator looking at the numbers from before.
+   */
+  const executeSSMMutation = useExecuteSSM();
+  const executeLPMMutation = useExecuteLPM();
 
   // Total seeds on hand for a variety (sum of all its lots)
   const varietyAvailable = (variety: string) =>
@@ -148,7 +220,7 @@ export default function CreateSowingPage() {
         // not sowable any more — the server refuses it (SPLAN-02) — so a stale
         // link must not pre-fill a record the save would reject.
         const entries = (plan.entries ?? []).filter(
-          (e: any) =>
+          (e) =>
             ids.includes(e.id) &&
             e.status !== "EXECUTED" &&
             e.status !== "CLOSED",
@@ -173,18 +245,22 @@ export default function CreateSowingPage() {
 
         // One record per selected entry (each keeps its own planEntryId)
         setValue("sowingType", plan.planType as "SSM" | "LPM");
-        const records = entries.map((entry: any) => ({
+        // Annotated, so `peatStockType` keeps the union the form's schema requires
+        // instead of widening to `string` — which is why this call stopped
+        // compiling once peat gained a stock type (SOW-16).
+        const records: SowingRecordFormInput[] = entries.map((entry) => ({
           planEntryId: entry.id,
           variety: entry.variety,
           lotNumber: "",
           stockType: entry.stockType,
+          peatLotNumber: "",
+          peatStockType: "CVT",
           tunnelId: "",
           sectorId: entry.sectorId ?? "",
           numberOfTrays: entry.plannedTrays ?? 0,
-          seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
           quantityUsed: entry.plannedQuantity ?? 0,
           lines: entry.lines ?? 0,
-          code: entry.code,
+          code: 0,
           metersPerLine: entry.metersPerLine ?? undefined,
         }));
         replace(records);
@@ -195,6 +271,8 @@ export default function CreateSowingPage() {
   async function onSubmit(data: SowingCreateFormInput) {
     setSubmitting(true);
     setServerError(null);
+    setValidationError(false);
+    setValidationProblems([]);
     try {
       for (const r of data.records) {
         const base = {
@@ -205,17 +283,18 @@ export default function CreateSowingPage() {
           remarks: r.remarks,
         };
         if (data.sowingType === "SSM") {
-          await executeSSM({
+          await executeSSMMutation.mutateAsync({
             ...base,
             variety: r.variety,
             code: r.code != null ? Number(r.code) : undefined,
             tunnelId: r.tunnelId || undefined,
             stockType: r.stockType,
+            peatLotNumber: r.peatLotNumber,
+            peatStockType: r.peatStockType,
             numberOfTrays: Number(r.numberOfTrays ?? 0),
-            seedsPerTray: Number(r.seedsPerTray),
           });
         } else {
-          await executeLPM({
+          await executeLPMMutation.mutateAsync({
             ...base,
             variety: r.variety,
             sectorId: r.sectorId || undefined,
@@ -245,6 +324,27 @@ export default function CreateSowingPage() {
     );
   }
 
+  /**
+   * A refused submit has to say so — and where.
+   *
+   * The offending record is opened (it may be collapsed) and the page is scrolled
+   * back to the banner, because the submit button sits in the header.
+   */
+  const onInvalid = (formErrors: FieldErrors<SowingCreateFormInput>) => {
+    setValidationProblems(collectValidationProblems(formErrors));
+    setValidationError(true);
+
+    const records = formErrors.records as unknown;
+    if (Array.isArray(records)) {
+      const firstBadRecord = records.findIndex(
+        (record) => !!record && Object.keys(record).length > 0,
+      );
+      if (firstBadRecord >= 0) setOpenEntry(firstBadRecord);
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="p-4 space-y-6">
       <button
@@ -254,7 +354,7 @@ export default function CreateSowingPage() {
         <ArrowLeft className="h-4 w-4" /> Back to Sowings
       </button>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -281,6 +381,25 @@ export default function CreateSowingPage() {
           </div>
         )}
 
+        {validationError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold">
+              Nothing was saved — some fields still need a value.
+            </p>
+            {validationProblems.length > 0 ? (
+              <ul className="mt-1.5 list-disc pl-5 space-y-0.5">
+                {validationProblems.map((problem) => (
+                  <li key={problem}>{problem}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1.5">
+                Please check the fields marked in red in the record below.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Global Fields */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -292,13 +411,23 @@ export default function CreateSowingPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Sowing Type <span className="text-red-400 font-normal"> *</span>
               </label>
-              <select
-                {...register("sowingType")}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="SSM">SSM — Tunnel (Tray)</option>
-                <option value="LPM">LPM — Field (Direct)</option>
-              </select>
+              {urlPlanId ? (
+                // Locked with the plan you came from: a tunnel line is a tunnel
+                // line, and the plans offered above follow this type.
+                <p className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40 px-3 py-2 text-sm text-gray-700 dark:text-gray-200">
+                  {sowingType === "LPM"
+                    ? "LPM — Field (Direct)"
+                    : "SSM — Tunnel (Tray)"}
+                </p>
+              ) : (
+                <select
+                  {...register("sowingType")}
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="SSM">SSM — Tunnel (Tray)</option>
+                  <option value="LPM">LPM — Field (Direct)</option>
+                </select>
+              )}
             </div>
 
             {/**Plan */}
@@ -306,17 +435,33 @@ export default function CreateSowingPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Plan <span className="text-red-400 font-normal"> *</span>
               </label>
-              <select
-                {...register("planId")}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select a plan...</option>
-                {activePlans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.planType} — {p.status})
-                  </option>
-                ))}
-              </select>
+              {urlPlanId ? (
+                <>
+                  {/* Shown as TEXT, not a choice: Execute was pressed on this
+                      plan line, so picking another plan can only be a mistake
+                      (user, 2026-10-11). The condition is the URL, not the loaded
+                      list, so it cannot flash a dropdown while the list arrives. */}
+                  <p className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40 px-3 py-2 text-sm text-gray-700 dark:text-gray-200">
+                    {presetPlan
+                      ? `${presetPlan.name} (${presetPlan.planType} — ${presetPlan.status})`
+                      : "The plan you came from"}
+                  </p>
+                  {/* The value still has to travel with the save. */}
+                  <input type="hidden" {...register("planId")} />
+                </>
+              ) : (
+                <select
+                  {...register("planId")}
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">Select a plan...</option>
+                  {selectablePlans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.planType} — {p.status})
+                    </option>
+                  ))}
+                </select>
+              )}
               {errors.planId && (
                 <p className="mt-1 text-xs text-red-600">
                   {errors.planId.message}
@@ -357,10 +502,15 @@ export default function CreateSowingPage() {
                   code: "",
                   lotNumber: "",
                   stockType: "",
+                  // The peat pool has to be part of a new record from the start.
+                  // Leaving it out meant "Add Record" produced a record that could
+                  // never be submitted, and — with no message for a refused submit
+                  // — the button appeared to do nothing (SOW-15, SOW-16).
+                  peatLotNumber: "",
+                  peatStockType: "CVT",
                   tunnelId: "",
                   sectorId: "",
                   numberOfTrays: "",
-                  seedsPerTray: DEFAULT_SEEDS_PER_TRAY,
                   quantityUsed: "",
                   lines: undefined,
                   metersPerLine: undefined,
@@ -385,9 +535,9 @@ export default function CreateSowingPage() {
                 : varietyVal;
             const lots = getLotsForVariety(varietyVal);
             const nTrays = Number(recordsValues?.[index]?.numberOfTrays ?? 0);
-            const sPerTray = Number(
-              recordsValues?.[index]?.seedsPerTray ?? DEFAULT_SEEDS_PER_TRAY,
-            );
+            // The figure is not asked for any more: the farm sets it once, and
+            // this form uses whatever is in force (SOW-11, phase 3).
+            const sPerTray = seedsPerTraySetting;
             const isFromPlan = !!recordsValues?.[index]?.planEntryId;
 
             // ---- stock availability (see part C) ----
@@ -595,6 +745,63 @@ export default function CreateSowingPage() {
                       {...register(`records.${index}.stockType`)}
                     />
 
+                    {/* Peat lot — SSM only: every SSM sowing uses peat */}
+                    {sowingType === "SSM" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Peat Lot{" "}
+                          <span className="text-red-400 font-normal"> *</span>
+                        </label>
+                        <select
+                          {...register(`records.${index}.peatLotNumber`, {
+                            onChange: (e) => {
+                              const lotNumber = e.target.value;
+                              const lot = peatItems.find(
+                                (item) => item.lotNumber === lotNumber,
+                              );
+                              if (lot)
+                                setValue(
+                                  `records.${index}.peatStockType`,
+                                  // The column is constrained to these two values;
+                                  // the picker only ever offers them.
+                                  lot.stockType as "BIO" | "CVT",
+                                );
+                            },
+                          })}
+                          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        >
+                          <option value="">Select peat lot...</option>
+                          {peatItems.map((item) => (
+                            <option key={item.id} value={item.lotNumber}>
+                              {item.lotNumber} ({item.stockType},{" "}
+                              {formatQuantity(
+                                item.currentQuantity,
+                                item.productType,
+                              )}
+                              )
+                            </option>
+                          ))}
+                        </select>
+                        {peatItems.length === 0 && (
+                          <p className="mt-1 text-xs text-amber-600">
+                            No peat in stock for this season — record the
+                            delivery first.
+                          </p>
+                        )}
+                        {recordErrors?.peatLotNumber && (
+                          <p className="mt-1 text-xs text-red-600">
+                            {recordErrors.peatLotNumber.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Hidden peatStockType — travels with the peat lot */}
+                    <input
+                      type="hidden"
+                      {...register(`records.${index}.peatStockType`)}
+                    />
+
                     {/* SSM */}
                     {sowingType === "SSM" && (
                       <>
@@ -639,8 +846,11 @@ export default function CreateSowingPage() {
                           {nTrays > 0 && (
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                               Big balls used:{" "}
-                              {(nTrays / TRAYS_PER_BIG_BALL).toFixed(2)} (1 ball
-                              = {TRAYS_PER_BIG_BALL} trays)
+                              {formatQuantity(
+                                nTrays / traysPerPeatBall,
+                                "PEAT",
+                              )}{" "}
+                              (1 ball = {traysPerPeatBall} trays)
                             </p>
                           )}
                           {recordErrors?.numberOfTrays && (
@@ -648,20 +858,6 @@ export default function CreateSowingPage() {
                               {recordErrors.numberOfTrays.message}
                             </p>
                           )}
-                        </div>
-                        {/* seeds per tray */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Seeds per Tray{" "}
-                            <span className="text-red-400 font-normal"> *</span>
-                          </label>
-                          <input
-                            type="number"
-                            {...register(`records.${index}.seedsPerTray`)}
-                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                            placeholder={`${DEFAULT_SEEDS_PER_TRAY}`}
-                            min={1}
-                          />
                         </div>
                         {/* total SSM seeds */}
                         {total && (

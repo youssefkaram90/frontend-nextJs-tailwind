@@ -19,7 +19,9 @@ export const PERMISSIONS = {
   "crop-care": ["view", "create", "edit", "delete"],
   phytosanitary: ["view", "create", "edit", "delete"],
   harvest: ["view", "create", "delete"],
-  shipments: ["view", "create", "edit", "delete"],
+  // Shipments are part of trucks — a load is only ever reached through the truck
+  // that carried it, so a module of its own could hide nothing (decided
+  // 2026-10-13, the same shape as tray transport riding `sowing.*`).
   trucks: ["view", "create", "edit", "delete"],
   users: ["view"],
   permissions: ["view"],

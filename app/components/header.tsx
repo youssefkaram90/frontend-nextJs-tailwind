@@ -20,19 +20,14 @@ import type { User } from "@/app/lib/types/user";
  */
 const SEASON_COOKIE = "season";
 
-function readSeasonCookie(): string {
-  if (typeof document === "undefined") return "";
-  const row = document.cookie
-    .split("; ")
-    .find((part) => part.startsWith(`${SEASON_COOKIE}=`));
-  return row ? decodeURIComponent(row.slice(SEASON_COOKIE.length + 1)) : "";
-}
+
 
 function writeSeasonCookie(id: string) {
   document.cookie = id
     ? `${SEASON_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=86400; samesite=lax`
     : `${SEASON_COOKIE}=; path=/; max-age=0; samesite=lax`;
 }
+
 
 export default function Header() {
   const router = useRouter();
@@ -41,18 +36,13 @@ export default function Header() {
   const { data: season } = useActiveSeason();
   const { isAdmin } = usePermissions();
   const { data: seasons = [] } = useSeasons(isAdmin);
-  const [viewing, setViewing] = useState("");
+
+ const [viewing, setViewing] = useState("");
 
   useEffect(() => {
     getCurrentUser()
       .then(setUser)
       .catch(() => setUser(null));
-  }, []);
-
-  // The cookie is the source of truth, but it is not reactive, so it is copied
-  // into state once on mount.
-  useEffect(() => {
-    setViewing(readSeasonCookie());
   }, []);
 
   /**

@@ -83,8 +83,8 @@ export default function ProgramPage() {
         <PageHeader
           title="Phytosanitary Program"
           description="Products that must be applied before harvest"
-          backTo="/phytosanitary"
-          backLabel="Back to Phytosanitary"
+          backTo="/crop-care"
+          backLabel="Back to Crop Care"
         />
         <div className="mt-6 text-gray-400">Loading…</div>
       </div>
@@ -96,8 +96,8 @@ export default function ProgramPage() {
       <PageHeader
         title="Phytosanitary Program"
         description="The products that must be applied during the growing period before harvest"
-        backTo="/phytosanitary"
-        backLabel="Back to Phytosanitary"
+        backTo="/crop-care"
+        backLabel="Back to Crop Care"
       />
 
       <form

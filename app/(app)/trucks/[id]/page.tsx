@@ -25,7 +25,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default function TruckDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { showToast } = useToast();
-  const caps = useCaps("shipments");
+  const caps = useCaps("trucks");
   const { data: truck, isLoading, isError, error } = useTruck(id);
   const deleteShipment = useDeleteShipment();
   const [deleting, setDeleting] = useState<string | null>(null);

@@ -34,7 +34,22 @@ export async function relay(
     });
 
     const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
+
+    let data: unknown = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // The backend answered, but not with JSON — a proxy page or a crash dump,
+        // most likely. "Could not reach the server" would be a lie here: it
+        // reached us. Say what actually happened, in the same plain register
+        // (AUTH-16).
+        return errorResponse(
+          "The server answered unexpectedly. Please try again.",
+          502,
+        );
+      }
+    }
 
     const headers = new Headers();
     for (const c of response.headers.getSetCookie()) {

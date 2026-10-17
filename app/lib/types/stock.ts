@@ -86,6 +86,25 @@ export function movementReasonLabel(reason: string | null): string {
   return match ? match.label : "—";
 }
 
+/**
+ * Every way a movement can arise, in words.
+ *
+ * These were printed raw on the stock screen — `manual`, `delivery`, `sowing` —
+ * which is a database value shown to a farmer. The words match the reason labels
+ * above: the ledger should read like a sentence, and the screen is the only
+ * place its reader ever sees it.
+ */
+const MOVEMENT_TYPES = [
+  { value: "delivery", label: "Delivery" },
+  { value: "sowing", label: "Sowing" },
+  { value: "manual", label: "Recorded by hand" },
+] as const;
+
+export function movementTypeLabel(referenceType: string | null): string {
+  const match = MOVEMENT_TYPES.find((t) => t.value === referenceType);
+  return match ? match.label : "—";
+}
+
 export type MovementReason = (typeof HAND_REASONS)[number]["value"];
 
 export type AdjustStockInput = {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import {
   CalendarClock,
   Plus,
@@ -18,6 +18,7 @@ import { useCaps } from "@/app/lib/hooks/use-permissions";
 import { useCreatePlan } from "@/app/lib/hooks/use-crop-care";
 import { useSeasonProducts } from "@/app/lib/hooks/use-agri-inputs";
 import type { LocationTarget } from "@/app/lib/types/crop-care";
+import { collectValidationProblems } from "@/app/lib/validation-problems";
 
 type Entry = {
   plannedDate: string;
@@ -43,7 +44,6 @@ export default function CreatePlanPage() {
     register,
     control,
     handleSubmit,
-    watch,
     setValue,
     formState: { errors },
   } = useForm<FormData>({
@@ -65,16 +65,28 @@ export default function CreatePlanPage() {
     control,
     name: "entries",
   });
-  const planType = watch("planType");
+  const planType = useWatch({ control, name: "planType" });
   const [locations, setLocations] = useState<LocationTarget[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [validationProblems, setValidationProblems] = useState<string[]>([]);
 
   const createPlan = useCreatePlan();
 
   const inputClass =
     "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500";
 
+  /**
+   * A refused submit has to say so (X-03). This form had no invalid handler at
+   * all, so "Create Plan" did nothing whenever a name or an entry was missing —
+   * the only message the page could show was the one about locations.
+   */
+  const onInvalid = (formErrors: unknown) => {
+    setValidationProblems(collectValidationProblems(formErrors));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   async function onSubmit(data: FormData) {
+    setValidationProblems([]);
     if (locations.length === 0) {
       showToast("Select at least one tunnel or sector", "error");
       return;
@@ -118,9 +130,22 @@ export default function CreatePlanPage() {
       />
 
       <form
-        onSubmit={handleSubmit(onSubmit)}
+        onSubmit={handleSubmit(onSubmit, onInvalid)}
         className="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-5"
       >
+        {validationProblems.length > 0 && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold">
+              Nothing was saved — some fields still need a value.
+            </p>
+            <ul className="mt-1.5 list-disc pl-5 space-y-0.5">
+              {validationProblems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Type */}
         <div className="grid grid-cols-3 gap-2 max-w-xl">
           <button
